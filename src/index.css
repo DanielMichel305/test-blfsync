@@ -1,0 +1,131 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg-color: #FDF8F5;
+  --primary-color: #1A1A1A;
+  --secondary-color: #d35400;
+  --heading-color: #1A1A1A;
+  --text-color: #4A4A4A;
+  --border-color: #E0E0E0;
+  
+  --secondary-light: #FDF1EB;
+  --secondary-dark: #b84700;
+  --secondary-deep: #8e3700;
+  
+  --cream: #FDF8F5;
+  --charcoal: #1A1A1A;
+  --sand: #E0E0E0;
+  --soft: #F7EFEA;
+  --card: #FFFFFF;
+}
+
+:root.dark {
+  --bg-color: #121212;
+  --primary-color: #FDF8F5;
+  --secondary-color: #ff7f32;
+  --heading-color: #FDF8F5;
+  --text-color: #BFBFBF;
+  --border-color: #2D2D2D;
+  
+  --secondary-light: #2c160a;
+  --secondary-dark: #ff7f32;
+  --secondary-deep: #ff9f66;
+  
+  --cream: #121212;
+  --charcoal: #FDF8F5;
+  --sand: #2D2D2D;
+  --soft: #1E1A17;
+  --card: #1C1917;
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  
+  --color-editorial-cream: var(--cream);
+  --color-editorial-charcoal: var(--charcoal);
+  --color-editorial-sand: var(--sand);
+  --color-editorial-soft: var(--soft);
+  --color-editorial-card: var(--card);
+  
+  --color-primary: var(--primary-color);
+  --color-secondary: var(--secondary-color);
+  --color-heading: var(--heading-color);
+  --color-text: var(--text-color);
+  --color-border: var(--border-color);
+  --color-background: var(--bg-color);
+  
+  --color-amber-50: var(--secondary-light);
+  --color-amber-500: var(--secondary);
+  --color-amber-600: var(--secondary-dark);
+  --color-amber-700: var(--secondary-dark);
+  --color-amber-900: var(--secondary-deep);
+}
+
+@layer base {
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    @apply font-sans antialiased transition-colors duration-200 overflow-x-hidden;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--heading-color);
+    @apply font-sans tracking-tight font-bold;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-color);
+}
+
+/* Urbi.ae Inspired Custom Design Utilities */
+.grid-bg-overlay {
+  background-image: linear-gradient(var(--border-color) 1px, transparent 1px),
+                    linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
+  background-size: 50px 50px;
+  background-position: center top;
+}
+
+.urbi-card {
+  background-color: var(--card);
+  border: 1px solid var(--border-color);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.urbi-card:hover {
+  border-color: var(--primary-color);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.08);
+}
+
+.dark .urbi-card:hover {
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.4);
+}
+
+.glass-pill {
+  backdrop-filter: blur(12px);
+  background-color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.dark .glass-pill {
+  background-color: rgba(28, 25, 23, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
