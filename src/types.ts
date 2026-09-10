@@ -3,28 +3,30 @@ export interface Track {
   name: string;
   target_unit_label: string;
   annual_target: number;
-  annual_budget: number;
-  min_monthly_gift: number; // For Rallies, set as 600
+  min_monthly_gift: number;
   cost_per_unit: number;
-  units_per_100_egp: number;
   current_raised: number;
   description: string;
-  icon: string; // lucide icon name
-  letter: string; // A, B, C, D, E, F, G
+  icon: string;
+  letter: string;
+  cover_url?: string | null;
+  target_period: 'Monthly' | 'Quarterly' | 'Annually';
+  is_active: boolean;
 }
 
 export interface Donor {
   donor_id: string;
   name: string;
   email: string;
-  phone: string;
+  phone?: string;
   join_date: string;
-  communication_opt_in: boolean;
-  referral_source: string;
+  communication_opt_in?: boolean;
+  referral_source?: string;
   avatar_url?: string;
   role: 'donor' | 'admin';
-  streak: number; // in months
-  last_donation_date: string | null;
+  api_role: 'admin' | 'family' | 'friend';
+  streak?: number;
+  last_donation_date?: string | null;
 }
 
 export interface Subscription {
@@ -49,13 +51,7 @@ export interface Transaction {
   frequency: 'monthly' | 'annual' | 'one-time';
 }
 
-export type BadgeType =
-  | 'first_step'
-  | 'three_month_faithful'
-  | 'anniversary_friend'
-  | 'gospel_multiplier'
-  | 'loyal_partner'
-  | 'kingdom_advocate';
+export type BadgeType = string;
 
 export interface Badge {
   badge_id: string;
@@ -63,7 +59,7 @@ export interface Badge {
   badge_type: BadgeType;
   name: string;
   description: string;
-  earned_date: string;
+  earned_date?: string;
 }
 
 export interface UpdateFeed {

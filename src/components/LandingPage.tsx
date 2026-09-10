@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Track, Donor, Subscription, Transaction, Badge } from '../types';
-import { calculateSubscriptionImpact } from '../db';
+import { calculateSubscriptionImpact, calculateTrackProgress } from '../utils/impact';
 import { useLanguage } from '../LanguageContext';
 import { getLocalizedTrackName, getLocalizedTrackDesc, getLocalizedTrackUnitLabel } from '../utils/localization';
 import { 
@@ -48,7 +48,7 @@ export default function LandingPage({
  onUserChange
 }: LandingPageProps) {
  const { t, language } = useLanguage();
- // Selected tracks for calculator simulator
+ // Selected tracks for the contract-based impact estimator.
  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([]);
 
  // Methodology modal states
@@ -72,11 +72,6 @@ export default function LandingPage({
   const [modalSliderVal, setModalSliderVal] = useState(500);
   useEffect(() => { if(selectedTrackModal) setModalSliderVal(selectedTrackModal.min_monthly_gift); }, [selectedTrackModal]);
 
-  // Live ministry impact counter states
-  const [videosWatched, setVideosWatched] = useState(153928120);
-  const [questionsAnswered, setQuestionsAnswered] = useState(424510);
-  const [professionsFaith, setProfessionsFaith] = useState(14820);
-
   // Quick Donation states
   const [quickTrackId, setQuickTrackId] = useState('');
   const [quickAmount, setQuickAmount] = useState(500);
@@ -87,29 +82,6 @@ export default function LandingPage({
       setQuickTrackId(tracks[0].track_id);
     }
   }, [tracks, quickTrackId]);
-
- useEffect(() => {
- const startTime = Date.now();
- 
- const interval = setInterval(() => {
- const elapsedMs = Date.now() - startTime;
- 
- // Gospel Message Streamed: 10 per second = 10 / 1000 = 0.01 per millisecond
- const addedVideos = Math.floor(elapsedMs * 0.01);
- 
- // Seeker Questions Answered: 14 per minute = 14 / 60000 = 0.000233333 per millisecond
- const addedQuestions = Math.floor(elapsedMs * (14 / 60000));
- 
- // Professions of Faith: 1 every 21 minutes = 1 / (21 * 60 * 1000) = 1 / 1260000 per millisecond
- const addedProfessions = Math.floor(elapsedMs * (1 / 1260000));
- 
- setVideosWatched(153928120 + addedVideos);
- setQuestionsAnswered(424510 + addedQuestions);
- setProfessionsFaith(14820 + addedProfessions);
- }, 100);
-
- return () => clearInterval(interval);
- }, []);
 
  // Smooth scroll & track highlight helper
  const handleStartSupporting = (trackId: string | null, minGift: number) => {
@@ -151,8 +123,9 @@ export default function LandingPage({
  };
 
  // Unsplash image source mapper for tracks
- const getTrackImage = (trackId: string): string => {
- switch (trackId) {
+ const getTrackImage = (track: Track): string => {
+ if (track.cover_url) return track.cover_url;
+ switch (track.track_id) {
  case 'gospel-reach':
  return 'https://images.unsplash.com/photo-1542810634-71277d95dcbb?w=800&auto=format&fit=crop&q=80';
  case 'answer-search':
@@ -169,20 +142,17 @@ export default function LandingPage({
  }
  };
 
- // Format budget currency
+ // Checkout currency is fixed by the API contract.
  const formatCurrency = (val: number) => {
  return new Intl.NumberFormat('en-US', {
  style: 'currency',
- currency: 'EGP',
+ currency: 'USD',
  maximumFractionDigits: 0
- }).format(val).replace('EGP', 'EGP ');
+ }).format(val);
  };
 
  // Thermometer progress
- const getPercent = (t: Track) => {
- if (!t.annual_budget) return 0;
- return Math.min(Math.round((t.current_raised / t.annual_budget) * 100), 100);
- };
+ const getPercent = calculateTrackProgress;
 
  // Calculate combined sowed seed metrics
  const selectedTracksList = tracks.filter(t => selectedTrackIds.includes(t.track_id));
@@ -218,10 +188,10 @@ export default function LandingPage({
  });
  };
 
- // Calculate simulated impact units
+ // Calculate estimated impact from the API cost-per-unit values.
  const actualAmount = Math.max(sliderVal, minMonthlyGiftSum);
  const splitAmount = actualAmount / (selectedTrackIds.length || 1);
- const totalSimulatedUnits = selectedTracksList.reduce((sum, track) => {
+ const totalEstimatedUnits = selectedTracksList.reduce((sum, track) => {
  const { monthlyUnits, annualUnits } = calculateSubscriptionImpact(track, splitAmount, frequency === 'annual' ? 'annual' : 'monthly');
  return sum + Math.round(frequency === 'monthly' ? monthlyUnits : annualUnits);
  }, 0);
@@ -253,7 +223,7 @@ export default function LandingPage({
  </div>
  <div className="flex items-center gap-1.5 text-[9px] font-mono text-editorial-charcoal/50 bg-editorial-card border border-editorial-charcoal/10 px-3 py-1.5 rounded-full shrink-0 shadow-3xs">
  <span className="w-1.5 h-1.5 rounded-full bg-orange-600 dark:bg-orange-500 dark:bg-orange-600 dark:bg-orange-500 animate-ping"></span>
- <span>{t("Live Counters Ticking", "إحصائيات حية")}</span>
+ <span>{t("Awaiting API counters", "بانتظار مؤشرات الواجهة")}</span>
  </div>
  </div>
 
@@ -267,7 +237,7 @@ export default function LandingPage({
  <div className="space-y-1">
  <span className="text-[9px] font-mono font-bold text-editorial-charcoal/40 uppercase tracking-widest block">{t("Gospel Message Streamed", "رسائل إنجيلية تم بثها")}</span>
  <p className="text-3xl font-bold text-editorial-charcoal tracking-tight font-mono">
- {videosWatched.toLocaleString()}
+ —
  </p>
  </div>
  <div className="p-2.5 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-xl shrink-0 border border-blue-100 dark:border-blue-900/45">
@@ -276,7 +246,7 @@ export default function LandingPage({
  </div>
  <div className="flex items-center gap-1.5 text-[10px] text-editorial-charcoal/50 border-t border-editorial-charcoal/5 pt-3">
  <span className="w-1.5 h-1.5 bg-orange-600 dark:bg-orange-500 dark:bg-orange-600 dark:bg-orange-500 rounded-full animate-pulse"></span>
- <span>10 messages streamed every second</span>
+ <span>{t('Live counter endpoint required', 'مطلوب مسار API للمؤشر المباشر')}</span>
  </div>
  </motion.div>
 
@@ -289,7 +259,7 @@ export default function LandingPage({
  <div className="space-y-1">
  <span className="text-[9px] font-mono font-bold text-editorial-charcoal/40 uppercase tracking-widest block">{t("Seeker Questions Answered", "تساؤلات مُجاب عنها")}</span>
  <p className="text-3xl font-bold text-editorial-charcoal tracking-tight font-mono">
- {questionsAnswered.toLocaleString()}
+ —
  </p>
  </div>
  <div className="p-2.5 bg-amber-50 dark:bg-amber-950/30 text-orange-600 dark:text-orange-400 dark:text-amber-400 rounded-xl shrink-0 border border-amber-100 dark:border-amber-900/45">
@@ -298,7 +268,7 @@ export default function LandingPage({
  </div>
  <div className="flex items-center gap-1.5 text-[10px] text-editorial-charcoal/50 border-t border-editorial-charcoal/5 pt-3">
  <span className="w-1.5 h-1.5 bg-orange-600 dark:bg-orange-500 dark:bg-orange-600 dark:bg-orange-500 rounded-full animate-pulse"></span>
- <span>14 questions answered every minute</span>
+ <span>{t('Live counter endpoint required', 'مطلوب مسار API للمؤشر المباشر')}</span>
  </div>
  </motion.div>
 
@@ -311,7 +281,7 @@ export default function LandingPage({
  <div className="space-y-1">
  <span className="text-[9px] font-mono font-bold text-editorial-charcoal/40 uppercase tracking-widest block">{t("Professions of Faith", "خطوات إيمان حقيقية")}</span>
  <p className="text-3xl font-bold text-editorial-charcoal tracking-tight font-mono">
- {professionsFaith.toLocaleString()}
+ —
  </p>
  </div>
  <div className="p-2.5 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 rounded-xl shrink-0 border border-rose-100 dark:border-rose-900/45">
@@ -320,7 +290,7 @@ export default function LandingPage({
  </div>
  <div className="flex items-center gap-1.5 text-[10px] text-editorial-charcoal/50 border-t border-editorial-charcoal/5 pt-3">
  <span className="w-1.5 h-1.5 bg-rose-600 dark:bg-rose-500 dark:bg-rose-600 dark:bg-rose-500 rounded-full animate-pulse"></span>
- <span>1 profession of faith every 21 minutes</span>
+ <span>{t('Live counter endpoint required', 'مطلوب مسار API للمؤشر المباشر')}</span>
  </div>
  </motion.div>
  </div>
@@ -374,7 +344,7 @@ export default function LandingPage({
                       }}
                     >
                       <div className="relative h-[320px] md:h-[400px] lg:h-[460px] overflow-hidden flex-1">
-                      <img src={getTrackImage(track.track_id)} alt={getLocalizedTrackName(track.track_id, getLocalizedTrackName(track.track_id, track.name, language), language)} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" referrerPolicy="no-referrer" />
+                      <img src={getTrackImage(track)} alt={getLocalizedTrackName(track.track_id, getLocalizedTrackName(track.track_id, track.name, language), language)} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" referrerPolicy="no-referrer" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 transition-all duration-700 group-hover:via-black/60 group-hover:to-black/30" />
                       
                       {/* Top Right Letter/Badge */}
@@ -407,7 +377,7 @@ export default function LandingPage({
                                   </span>
                                 </div>
                                 <div className="text-lg font-bold text-white font-serif">
-                                  {track.annual_target.toLocaleString()} <span className="text-sm font-sans font-normal text-white/70">{getLocalizedTrackUnitLabel(track.track_id, track.target_unit_label, language)}</span>
+                                  {track.annual_target.toLocaleString()} <span className="text-sm font-sans font-normal text-white/70">{getLocalizedTrackUnitLabel(track.track_id, track.target_unit_label, language)} · {track.target_period}</span>
                                 </div>
                                 <div className="mt-3 h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
                                   <motion.div 
@@ -488,7 +458,7 @@ export default function LandingPage({
                       <span className="text-5xl md:text-6xl font-serif text-editorial-charcoal font-medium tracking-tight">
                         {Math.max(sliderVal, minMonthlyGiftSum).toLocaleString()}
                       </span>
-                      <span className="text-sm font-bold text-editorial-charcoal/50">{t("EGP", "جنيه")}</span>
+                      <span className="text-sm font-bold text-editorial-charcoal/50">{t("USD", "دولار")}</span>
                     </div>
                   </div>
 
@@ -557,7 +527,7 @@ export default function LandingPage({
                       {t('YOU CAN REACH', 'يمكنك الوصول إلى')}
                     </span>
                     <div className="text-7xl lg:text-8xl font-serif text-white leading-none font-medium my-4 tracking-tighter">
-                      ~{Math.round(totalSimulatedUnits).toLocaleString()}
+                      ~{Math.round(totalEstimatedUnits).toLocaleString()}
                     </div>
                     <span className="text-xs uppercase tracking-[0.2em] font-bold text-emerald-400 font-mono mt-4 bg-emerald-950/50 inline-block px-4 py-1.5 rounded-full border border-emerald-800/50">
                       PEOPLE {frequency === 'monthly' ? t('EVERY MONTH', 'كل شهر') : frequency === 'annual' ? t('EVERY YEAR', 'كل سنة') : t('ONCE', 'مرة واحدة')}
@@ -616,9 +586,12 @@ export default function LandingPage({
                     <div className="pt-6 mt-4 border-t border-white/10">
                       <button 
                         onClick={() => {
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                          setTimeout(() => onOpenAuth(), 500);
+                          const checkoutTrack = selectedTracksList[0];
+                          if (checkoutTrack) {
+                            onDonateClick(checkoutTrack, actualAmount, frequency);
+                          }
                         }}
+                        disabled={selectedTracksList.length === 0}
                         className="w-full py-4 bg-orange-600 dark:bg-orange-500 dark:bg-orange-600 hover:bg-orange-500 dark:bg-orange-600 dark:bg-orange-500 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-[0_4px_14px_0_rgba(234,88,12,0.39)] hover:shadow-[0_6px_20px_rgba(234,88,12,0.23)] hover:-translate-y-0.5 flex items-center justify-center gap-2"
                       >
                         <Flame className="w-4 h-4" />
@@ -657,7 +630,7 @@ export default function LandingPage({
 
               <div className="relative h-48 md:h-64 shrink-0">
                 <img 
-                  src={getTrackImage(selectedTrackModal.track_id)} 
+                  src={getTrackImage(selectedTrackModal)}
                   alt={selectedTrackModal.name}
                   className="w-full h-full object-cover"
                 />
@@ -690,7 +663,7 @@ export default function LandingPage({
                   <div className="bg-editorial-cream border border-editorial-charcoal/10 rounded-2xl p-4 text-center flex-1 min-w-[150px]">
                     <span className="block text-[9px] uppercase tracking-widest text-editorial-charcoal/50 font-bold mb-1 font-mono">{t("Target Goal", "الهدف المطلوب")}</span>
                     <span className="block text-xl font-bold text-editorial-charcoal">{selectedTrackModal.annual_target.toLocaleString()}</span>
-                    <span className="block text-[10px] font-normal font-serif italic text-editorial-charcoal/60 mt-1 leading-tight">{getLocalizedTrackUnitLabel(selectedTrackModal.track_id, selectedTrackModal.target_unit_label, language)}</span>
+                    <span className="block text-[10px] font-normal font-serif italic text-editorial-charcoal/60 mt-1 leading-tight">{getLocalizedTrackUnitLabel(selectedTrackModal.track_id, selectedTrackModal.target_unit_label, language)} · {selectedTrackModal.target_period}</span>
                   </div>
                   <div className="bg-editorial-cream border border-editorial-charcoal/10 rounded-2xl p-4 text-center flex-1 min-w-[150px]">
                     <span className="block text-[9px] uppercase tracking-widest text-editorial-charcoal/50 font-bold mb-1 font-mono">{t("Progress", "معدل التقدم")}</span>
@@ -706,7 +679,7 @@ export default function LandingPage({
                     </div>
                     <div className="text-right">
                       <span className="block text-[10px] uppercase tracking-widest text-emerald-600 dark:text-emerald-400/70 font-bold mb-1 font-mono">{t("Estimated Impact", "الأثر المتوقع")}</span>
-                      <span className="block text-2xl font-bold text-emerald-600 dark:text-emerald-400">~{Math.round((modalSliderVal / 100) * selectedTrackModal.units_per_100_egp).toLocaleString()} <span className="text-sm font-normal">{getLocalizedTrackUnitLabel(selectedTrackModal.track_id, selectedTrackModal.target_unit_label, language)}</span></span>
+                      <span className="block text-2xl font-bold text-emerald-600 dark:text-emerald-400">~{Math.round(modalSliderVal / selectedTrackModal.cost_per_unit).toLocaleString()} <span className="text-sm font-normal">{getLocalizedTrackUnitLabel(selectedTrackModal.track_id, selectedTrackModal.target_unit_label, language)}</span></span>
                     </div>
                   </div>
                   <div className="w-full relative px-2 pt-2">
@@ -764,6 +737,7 @@ export default function LandingPage({
  isOpen={isMethodologyOpen}
  onClose={() => setIsMethodologyOpen(false)}
  highlightTrackId={methodologyTrackId}
+ tracks={tracks}
  />
 
  </div>

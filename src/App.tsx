@@ -1,7 +1,6 @@
 import { useLanguage } from './LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { Donor, Track, Subscription, Transaction, Badge, UpdateFeed, LeaderboardEntry } from './types';
-import { db } from './db';
 import Header from './components/Header';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
@@ -9,8 +8,10 @@ import AdminPanel from './components/AdminPanel';
 import LoginPage from './components/LoginPage';
 import DonationModal from './components/DonationModal';
 import MobileBottomNav from './components/MobileBottomNav';
+import { AcceptInvitePage, PaymentResultPage } from './components/RoutePages';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart } from 'lucide-react';
+import { useAnnouncements, useMinistryTracks, usePublicAnnouncements, usePublicTestimonies, usePublicTracks, useSessionRestore, useTestimonies, useUserBadges } from './api/hooks';
+import { announcementToUpdate, ministryTrackToTrack, publicMinistryTrackToTrack, testimonyToUpdate, userBadgeToBadge, userToDonor } from './api/adapters';
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -39,14 +40,29 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<Donor | null>(null);
   const [activeTab, setActiveTab] = useState<'landing' | 'dashboard' | 'admin'>('landing');
   const [dashboardSubTab, setDashboardSubTab] = useState<'dashboard' | 'overview' | 'profile' | 'referrals' | 'prayer'>('overview');
+  const [pathname, setPathname] = useState(() => window.location.pathname);
+  const selectedUserId = pathname.match(/^\/users\/([^/]+)\/?$/)?.[1];
+  const selectedTrackId = pathname.match(/^\/tracks\/([^/]+)\/?$/)?.[1];
 
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [donors, setDonors] = useState<Donor[]>([]);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [badges, setBadges] = useState<Badge[]>([]);
-  const [updates, setUpdates] = useState<UpdateFeed[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const session = useSessionRestore();
+  const authenticated = !!currentUser;
+  const tracksQuery = useMinistryTracks({ page: 1, limit: 100 }, authenticated);
+  const publicTracksQuery = usePublicTracks({ page: 1, limit: 100 }, !authenticated);
+  const badgesQuery = useUserBadges(currentUser?.donor_id || '', authenticated);
+  const announcementsQuery = useAnnouncements({ page: 1, limit: 20 }, authenticated);
+  const testimoniesQuery = useTestimonies({ page: 1, limit: 20 }, authenticated);
+  const publicAnnouncementsQuery = usePublicAnnouncements({ page: 1, limit: 20 }, !authenticated);
+  const publicTestimoniesQuery = usePublicTestimonies({ page: 1, limit: 20 }, !authenticated);
+
+  const tracks: Track[] = authenticated ? (tracksQuery.data?.ministryTracks || []).map(ministryTrackToTrack) : (publicTracksQuery.data?.ministryTracks || []).map(publicMinistryTrackToTrack);
+  const badges: Badge[] = (badgesQuery.data || []).filter(badge => badge.earned).map(badge => userBadgeToBadge(badge, currentUser?.donor_id || ''));
+  const updates: UpdateFeed[] = [
+    ...((authenticated ? announcementsQuery.data : publicAnnouncementsQuery.data)?.announcements || []).map(announcementToUpdate),
+    ...((authenticated ? testimoniesQuery.data : publicTestimoniesQuery.data)?.testimonies || []).map(testimonyToUpdate),
+  ].sort((a, b) => new Date(b.publish_date).getTime() - new Date(a.publish_date).getTime());
+  const subscriptions: Subscription[] = [];
+  const transactions: Transaction[] = [];
+  const leaderboard: LeaderboardEntry[] = [];
 
   const [donationWizardData, setDonationWizardData] = useState<{
     track: Track;
@@ -55,54 +71,107 @@ export default function App() {
   } | null>(null);
 
   const { t } = useLanguage();
-  const [unlockedBadgeNotify, setUnlockedBadgeNotify] = useState<Badge | null>(null);
-
-  const refreshState = () => {
-    setTracks(db.getTracks());
-    setDonors(db.getDonors());
-    setSubscriptions(db.getSubscriptions());
-    setTransactions(db.getTransactions());
-    setBadges(db.getBadges());
-    setUpdates(db.getUpdates());
-    setLeaderboard(db.getLeaderboard());
-
-    const current = db.getCurrentUser();
-    setCurrentUser(current);
-  };
+  const [unlockedBadgeNotify] = useState<Badge | null>(null);
 
   useEffect(() => {
-    refreshState();
+    setCurrentUser(session.data ? userToDonor(session.data) : null);
+  }, [session.data]);
+
+  useEffect(() => {
+    const clear = () => setCurrentUser(null);
+    window.addEventListener('better-life:session-cleared', clear);
+    return () => window.removeEventListener('better-life:session-cleared', clear);
   }, []);
 
+  useEffect(() => {
+    const syncPath = () => setPathname(window.location.pathname);
+    window.addEventListener('popstate', syncPath);
+    return () => window.removeEventListener('popstate', syncPath);
+  }, []);
+
+  useEffect(() => {
+    if (currentUser?.role === 'admin' && (selectedUserId || selectedTrackId)) setActiveTab('admin');
+  }, [currentUser, selectedUserId, selectedTrackId]);
+
+  const navigateToUser = (id: string) => {
+    const url = new URL(window.location.href);
+    url.pathname = `/users/${encodeURIComponent(id)}`;
+    url.searchParams.set('admin_tab', 'users');
+    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    setPathname(url.pathname);
+    setActiveTab('admin');
+  };
+
+  const closeUserDetail = () => {
+    const url = new URL(window.location.href);
+    url.pathname = '/';
+    url.searchParams.set('admin_tab', 'users');
+    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    setPathname(url.pathname);
+  };
+
+  const navigateToTrack = (id: string) => {
+    const url = new URL(window.location.href);
+    url.pathname = `/tracks/${encodeURIComponent(id)}`;
+    url.searchParams.set('admin_tab', 'tracks');
+    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    setPathname(url.pathname);
+    setActiveTab('admin');
+  };
+
+  const closeTrackDetail = () => {
+    const url = new URL(window.location.href);
+    url.pathname = '/';
+    url.searchParams.set('admin_tab', 'tracks');
+    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    setPathname(url.pathname);
+  };
+
   const handleUserChange = (user: Donor | null) => {
-    db.setCurrentUser(user);
-    refreshState();
+    setCurrentUser(user);
   };
 
   const handleDonateTrigger = (track: Track, amount: number, frequency: 'monthly' | 'annual' | 'one-time', isGuest: boolean = false) => {
-    if (!isGuest && !db.getCurrentUser()) {
-      setActiveTab('dashboard');
-      return;
-    }
-    setDonationWizardData({ track, amount, frequency });
+    setDonationWizardData({ track, amount, frequency: (!currentUser || isGuest) ? 'one-time' : frequency });
   };
 
-  const handleDonationSuccess = (user: Donor, newBadges: Badge[]) => {
-    refreshState();
-    if (newBadges.length > 0) {
-      setUnlockedBadgeNotify(newBadges[0]);
-      setTimeout(() => setUnlockedBadgeNotify(null), 5000);
-    }
+  const handleDonationSuccess = () => {
+    setDonationWizardData(null);
   };
 
   const handleAuthSuccess = (user: Donor) => {
-    refreshState();
+    setCurrentUser(user);
     if (user.role === 'admin') {
       setActiveTab('admin');
     } else {
       setActiveTab('dashboard');
     }
   };
+
+  const leaveStandaloneRoute = (destination: 'dashboard' | 'login', user?: Donor) => {
+    const url = new URL(window.location.href);
+    url.pathname = '/';
+    url.search = '';
+    window.history.replaceState({}, '', url.pathname);
+    setPathname(url.pathname);
+    if (user) handleAuthSuccess(user);
+    else {
+      setActiveTab('dashboard');
+      setDashboardSubTab(destination === 'dashboard' ? 'overview' : 'overview');
+    }
+  };
+
+  if (pathname === '/accept-invite' || pathname === '/accept-invite/') {
+    return <AcceptInvitePage onAccepted={user => leaveStandaloneRoute('dashboard', user)} onSignIn={() => leaveStandaloneRoute('login')} />;
+  }
+
+  if (pathname === '/payments/success' || pathname === '/payments/success/') {
+    return <PaymentResultPage outcome="success" onContinue={() => leaveStandaloneRoute('dashboard')} onTryAgain={() => leaveStandaloneRoute('dashboard')} />;
+  }
+
+  if (['/payments/failure', '/payments/failure/', '/payments/failed', '/payments/cancel'].includes(pathname)) {
+    return <PaymentResultPage outcome="failure" onContinue={() => leaveStandaloneRoute('dashboard')} onTryAgain={() => leaveStandaloneRoute('dashboard')} />;
+  }
 
   return (
     <div id="portal-root" className="relative min-h-screen bg-editorial-cream text-editorial-charcoal flex flex-col justify-between selection:bg-editorial-charcoal/10 selection:text-editorial-charcoal overflow-x-hidden">
@@ -122,6 +191,11 @@ export default function App() {
         id="app-main-content"
         className={`flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 w-full ${currentUser ? 'pb-24 md:pb-8' : 'pb-8'}`}
       >
+        {(tracksQuery.error || announcementsQuery.error || testimoniesQuery.error) && currentUser && (
+          <div role="alert" className="mb-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-xs text-rose-800 dark:text-rose-300">
+            {t('Some portal data could not be loaded. Please try again shortly.', 'تعذر تحميل بعض بيانات البوابة. يرجى المحاولة مرة أخرى قريباً.')}
+          </div>
+        )}
         <AnimatePresence mode="wait">
           {activeTab === 'landing' && (
             <motion.div
@@ -205,12 +279,12 @@ export default function App() {
                 <AdminPanel
                   currentUser={currentUser}
                   tracks={tracks}
-                  donors={donors}
-                  updates={updates}
-                  subscriptions={subscriptions}
-                  transactions={transactions}
-                  onUpdateTracks={setTracks}
-                  onUpdateUpdates={setUpdates}
+                  selectedUserId={selectedUserId ? decodeURIComponent(selectedUserId) : undefined}
+                  selectedTrackId={selectedTrackId ? decodeURIComponent(selectedTrackId) : undefined}
+                  onOpenUser={navigateToUser}
+                  onCloseUser={closeUserDetail}
+                  onOpenTrack={navigateToTrack}
+                  onCloseTrack={closeTrackDetail}
                 />
               </motion.div>
             )

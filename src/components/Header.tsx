@@ -1,24 +1,19 @@
 import React, { useState } from "react";
 import { Donor } from "../types";
-import { db, notifications, markAllNotificationsRead, markNotificationRead } from "../db";
 import {
   Heart,
   User,
   Shield,
   LogOut,
   ArrowRight, X, Bell,
-  Layers,
   Sun,
   Moon,
   Globe,
   Menu,
 } from "lucide-react";
-import { PARTNERSHIP_TIERS_DATA } from "./Dashboard";
 import { useLanguage } from "../LanguageContext";
-import {
-  getLocalizedDonorName,
-  getLocalizedTierName,
-} from "../utils/localization";
+import { useLogout, useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '../api/hooks';
+import { notificationToDisplay } from '../api/adapters';
 
 interface HeaderProps {
   currentUser: Donor | null;
@@ -46,61 +41,32 @@ export default function Header({
   theme,
   onToggleTheme,
 }: HeaderProps) {
-  const [showPersonaMenu, setShowPersonaMenu] = useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const donors = db.getDonors();
   const { language, setLanguage, t } = useLanguage();
+  const notificationFeed = useNotifications({ page: 1, limit: 20 }, !!currentUser);
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
+  const logout = useLogout();
+  const notifications = (notificationFeed.data?.notifications || []).map(notification => notificationToDisplay(notification, currentUser?.donor_id || ''));
 
   const getUserTierName = () => {
     if (!currentUser) return "";
     if (currentUser.role === "admin")
       return t("Staff Admin", "مسؤول النظام والخدمة");
 
-    // Calculate commitment monthly
-    const userSubs = db
-      .getSubscriptions()
-      .filter(
-        (s) => s.donor_id === currentUser.donor_id && s.status === "active",
-      );
-    const activeMonthlyCommitment = userSubs
-      .filter((s) => s.frequency === "monthly")
-      .reduce((sum, s) => sum + s.amount, 0);
-    const activeAnnualCommitment = userSubs
-      .filter((s) => s.frequency === "annual")
-      .reduce((sum, s) => sum + s.amount, 0);
-    const currentCommitmentMonthly =
-      activeMonthlyCommitment + Math.round(activeAnnualCommitment / 12);
-
-    const matchingTier = PARTNERSHIP_TIERS_DATA.find(
-      (tier) => currentCommitmentMonthly >= tier.minMonthly,
-    );
-    if (matchingTier) {
-      return getLocalizedTierName(matchingTier.name, language);
-    }
-    return getLocalizedTierName("Seed Planter", language);
+    return currentUser.api_role === 'family'
+      ? t('Family Partner', 'شريك العائلة')
+      : t('Ministry Friend', 'صديق الخدمة');
   };
 
-  const handleSelectPersona = (donorId: string) => {
-    const selected = donors.find((d) => d.donor_id === donorId) || null;
-    onUserChange(selected);
-    setShowPersonaMenu(false);
-
-    // Auto switch tabs based on user role
-    if (selected) {
-      if (selected.role === "admin") {
-        setActiveTab("admin");
-      } else {
-        setActiveTab("dashboard");
-      }
-    } else {
+  const handleLogout = async () => {
+    try {
+      await logout.mutateAsync();
+    } finally {
+      onUserChange(null);
       setActiveTab("landing");
     }
-  };
-
-  const handleLogout = () => {
-    onUserChange(null);
-    setActiveTab("landing");
   };
 
   return (
@@ -114,9 +80,7 @@ export default function Header({
           id="logo-container"
           className="flex items-center gap-3.5 cursor-pointer animate-fade-in shrink-0"
           onClick={() => {
-            if (currentUser?.role === "admin") {
-              setActiveTab("admin");
-            } else if (currentUser) {
+            if (currentUser) {
               setActiveTab("dashboard");
               setDashboardSubTab("overview");
             } else {
@@ -139,7 +103,7 @@ export default function Header({
           id="main-navigation"
           className="hidden md:flex items-center gap-2"
         >
-          {(!currentUser || currentUser.role === "donor") && (
+          {(!currentUser || currentUser.role === "donor" || currentUser.role === "admin") && (
             <>
               <button
                 onClick={() => {
@@ -240,7 +204,7 @@ export default function Header({
 
           
           {/* Notifications Toggle */}
-          {currentUser && currentUser.role !== 'admin' && (
+          {currentUser && (
             <div className="relative">
               <button
                 onClick={() => setShowNotificationsMenu(!showNotificationsMenu)}
@@ -248,7 +212,7 @@ export default function Header({
                 title={t("Notifications", "الإشعارات")}
               >
                 <Bell className="w-3.5 h-3.5" />
-                {notifications.filter(n => n.donor_id === currentUser.donor_id && !n.read).length > 0 && (
+                {(notificationFeed.data?.unreadCount || 0) > 0 && (
                   <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 dark:bg-red-600 dark:bg-red-500 rounded-full border border-editorial-cream"></span>
                 )}
               </button>
@@ -260,17 +224,19 @@ export default function Header({
                       {t("Notifications", "الإشعارات")}
                     </span>
                     <button 
-                      onClick={() => {
-                        markAllNotificationsRead(currentUser.donor_id);
-                        setShowNotificationsMenu(false);
-                      }}
+                      onClick={() => markAllRead.mutate(undefined, { onSuccess: () => setShowNotificationsMenu(false) })}
+                      disabled={markAllRead.isPending}
                       className="text-[10px] text-editorial-charcoal/60 hover:text-editorial-charcoal"
                     >
                       {t("Mark all read", "تحديد الكل كمقروء")}
                     </button>
                   </div>
                   <div className="max-h-64 overflow-y-auto">
-                    {notifications.filter(n => n.donor_id === currentUser.donor_id).length === 0 ? (
+                    {notificationFeed.error ? (
+                      <div role="alert" className="p-4 text-center text-xs text-rose-600">
+                        {t("Notifications could not be loaded.", "تعذر تحميل الإشعارات.")}
+                      </div>
+                    ) : notifications.filter(n => n.donor_id === currentUser.donor_id).length === 0 ? (
                       <div className="p-4 text-center text-xs text-editorial-charcoal/50">
                         {t("No new notifications.", "لا توجد إشعارات جديدة.")}
                       </div>
@@ -280,10 +246,7 @@ export default function Header({
                           key={n.notification_id} 
                           className={`p-3 border-b border-editorial-charcoal/5 ${!n.read ? 'bg-editorial-soft/20' : ''}`}
                           onClick={() => {
-                            markNotificationRead(n.notification_id);
-                            // forces a re-render
-                            setShowNotificationsMenu(prev => !prev);
-                            setTimeout(() => setShowNotificationsMenu(prev => !prev), 0);
+                            if (!n.read) markRead.mutate(n.notification_id);
                           }}
                         >
                           <div className="flex items-start gap-2">
@@ -328,7 +291,7 @@ export default function Header({
               </div>
               <div className="text-left rtl:text-right hidden lg:block">
                 <p className="text-[11px] font-extrabold text-editorial-charcoal max-w-[100px] truncate">
-                  {getLocalizedDonorName(currentUser.name, language)}
+                  {currentUser.name}
                 </p>
                 <p className="text-[8px] font-mono uppercase tracking-wider text-editorial-charcoal/50 truncate capitalize">
                   {getUserTierName()}
@@ -372,7 +335,7 @@ export default function Header({
         {/* Mobile Menu Dropdown */}
         {isMobileMenuOpen && (
           <div className="md:hidden absolute top-[110%] left-0 right-0 bg-editorial-cream border border-editorial-charcoal/10 rounded-2xl p-4 shadow-xl flex flex-col gap-2 z-50">
-            {(!currentUser || currentUser.role === "donor") && (
+            {(!currentUser || currentUser.role === "donor" || currentUser.role === "admin") && (
               <>
                 <button
                   onClick={() => {

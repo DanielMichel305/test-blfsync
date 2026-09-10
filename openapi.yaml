@@ -1,0 +1,3914 @@
+openapi: 3.0.3
+info:
+  title: Better Life Foundation API
+  version: 1.0.0
+  description: Authenticated backend API for Better Life Foundation.
+servers:
+  - url: http://localhost:3001/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: System
+    description: Service health checks.
+  - name: Authentication
+    description: Sign-in, invitation acceptance, tokens, and account security.
+  - name: Users
+    description: User administration and earned-badge lookups.
+  - name: Invitations
+    description: Invitation lifecycle management.
+  - name: Audit Logs
+    description: Admin-only audit history.
+  - name: Ministry Tracks
+    description: Ministry-track browsing and administration.
+  - name: Announcements
+    description: Dashboard announcements and their admin management workflow.
+  - name: Notifications
+    description: User notification feed and admin notification delivery.
+  - name: Testimonies
+    description: Testimony feed and admin editorial workflow.
+  - name: Webhooks
+    description: External payment-provider callbacks.
+  - name: Subscriptions
+    description: One-time donations and recurring ministry-track subscriptions.
+  - name: Badges
+    description: Admin-only badge definition management.
+  - name: Prayer Wall
+    description: Prayer and praise feed interactions.
+  - name: Prayer Wall Moderation
+    description: Admin-only prayer wall moderation.
+paths:
+  /badges:
+    get:
+      tags: [Badges]
+      summary: List badge definitions
+      description: Admin-only management view of active and retired badge definitions.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Search"
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, name, order, isActive]
+            default: createdAt
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+      responses:
+        "200":
+          description: Paginated badge definitions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadgePage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Badges]
+      summary: Create a badge definition
+      description: Admin-only. Active definitions are locked when created.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBadgeRequest"
+      responses:
+        "201":
+          description: Badge definition created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, badge]
+                properties:
+                  message:
+                    type: string
+                  badge:
+                    $ref: "#/components/schemas/Badge"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /badges/{id}:
+    parameters:
+      - $ref: "#/components/parameters/BadgeId"
+    get:
+      tags: [Badges]
+      summary: Retrieve a badge definition
+      responses:
+        "200":
+          description: Badge definition.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [badge]
+                properties:
+                  badge:
+                    $ref: "#/components/schemas/Badge"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Badges]
+      summary: Update a badge definition
+      description: Admin-only. Trigger, requirement, and code fields cannot change after a definition is locked.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBadgeRequest"
+      responses:
+        "200":
+          description: Badge definition updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, badge]
+                properties:
+                  message:
+                    type: string
+                  badge:
+                    $ref: "#/components/schemas/Badge"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Badges]
+      summary: Delete a retired, unawarded badge definition
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /badges/{id}/retire:
+    parameters:
+      - $ref: "#/components/parameters/BadgeId"
+    patch:
+      tags: [Badges]
+      summary: Retire a badge definition
+      description: Makes the badge inactive without removing existing awards.
+      responses:
+        "200":
+          description: Badge retired. Repeated retirement is idempotent.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, badge]
+                properties:
+                  message:
+                    type: string
+                  badge:
+                    $ref: "#/components/schemas/Badge"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /prayer-wall:
+    get:
+      tags: [Prayer Wall]
+      summary: List visible prayer wall threads
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, prayer, praise]
+            default: all
+      responses:
+        "200":
+          description: Paginated newest-first prayer wall feed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThreadPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Prayer Wall]
+      summary: Create a prayer or praise thread
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateThreadRequest"
+      responses:
+        "201":
+          description: Thread created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, thread]
+                properties:
+                  message:
+                    type: string
+                  thread:
+                    $ref: "#/components/schemas/PrayerWallThread"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /prayer-wall/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ThreadId"
+    get:
+      tags: [Prayer Wall]
+      summary: Get a visible thread and its comments
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Thread detail with paginated comments.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [thread, comments]
+                properties:
+                  thread:
+                    $ref: "#/components/schemas/PrayerWallThread"
+                  comments:
+                    $ref: "#/components/schemas/CommentPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Prayer Wall]
+      summary: Soft-delete the current user's thread
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /prayer-wall/{id}/comments:
+    parameters:
+      - $ref: "#/components/parameters/ThreadId"
+    get:
+      tags: [Prayer Wall]
+      summary: List visible comments on a visible thread
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Paginated comments ordered oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Prayer Wall]
+      summary: Add a comment to a visible thread
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+      responses:
+        "201":
+          description: Comment created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, comment]
+                properties:
+                  message:
+                    type: string
+                  comment:
+                    $ref: "#/components/schemas/PrayerWallComment"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /prayer-wall/{threadId}/comments/{commentId}:
+    delete:
+      tags: [Prayer Wall]
+      summary: Soft-delete the current user's comment
+      parameters:
+        - $ref: "#/components/parameters/ThreadIdNamed"
+        - $ref: "#/components/parameters/CommentId"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /prayer-wall/{id}/reactions/{reactionType}:
+    parameters:
+      - $ref: "#/components/parameters/ThreadId"
+      - $ref: "#/components/parameters/ReactionType"
+    put:
+      tags: [Prayer Wall]
+      summary: Add a reaction idempotently
+      description: Like and join-in-prayer are independent and both are available on prayers and praises.
+      responses:
+        "200":
+          description: Current reaction state and whether a row was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, reactions]
+                properties:
+                  created:
+                    type: boolean
+                  reactions:
+                    $ref: "#/components/schemas/ReactionSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Prayer Wall]
+      summary: Remove a reaction idempotently
+      responses:
+        "200":
+          description: Current reaction state and whether a row was removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [removed, reactions]
+                properties:
+                  removed:
+                    type: boolean
+                  reactions:
+                    $ref: "#/components/schemas/ReactionSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /prayer-wall/manage/threads:
+    get:
+      tags: [Prayer Wall Moderation]
+      summary: List threads for moderation
+      description: Anonymous author identities are included for admins.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Search"
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [prayer, praise]
+        - $ref: "#/components/parameters/ModerationStatus"
+      responses:
+        "200":
+          description: Paginated moderation thread queue.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Pagination"
+                  - type: object
+                    required: [threads]
+                    properties:
+                      threads:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ManagedThread"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /prayer-wall/manage/threads/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ThreadId"
+    get:
+      tags: [Prayer Wall Moderation]
+      summary: Get a thread for moderation
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Managed thread and all comments, including removed comments.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [thread, comments]
+                properties:
+                  thread:
+                    $ref: "#/components/schemas/ManagedThread"
+                  comments:
+                    $ref: "#/components/schemas/ManagedCommentPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Prayer Wall Moderation]
+      summary: Remove a thread from the public feed
+      description: Removing a thread hides its entire comment subtree without deleting records.
+      requestBody:
+        $ref: "#/components/requestBodies/ModerationReason"
+      responses:
+        "200":
+          description: Updated managed thread detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, thread, comments]
+                properties:
+                  message:
+                    type: string
+                  thread:
+                    $ref: "#/components/schemas/ManagedThread"
+                  comments:
+                    $ref: "#/components/schemas/ManagedCommentPage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /prayer-wall/manage/threads/{id}/restore:
+    patch:
+      tags: [Prayer Wall Moderation]
+      summary: Restore a removed thread
+      description: Previously visible comments become visible again; independently removed comments stay removed.
+      parameters:
+        - $ref: "#/components/parameters/ThreadId"
+      responses:
+        "200":
+          description: Restored managed thread detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, thread, comments]
+                properties:
+                  message:
+                    type: string
+                  thread:
+                    $ref: "#/components/schemas/ManagedThread"
+                  comments:
+                    $ref: "#/components/schemas/ManagedCommentPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /prayer-wall/manage/comments:
+    get:
+      tags: [Prayer Wall Moderation]
+      summary: List comments for moderation
+      description: This is a separate queue from thread moderation and includes anonymous author identities.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/ModerationStatus"
+        - name: threadId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Paginated moderation comment queue.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Pagination"
+                  - type: object
+                    required: [comments]
+                    properties:
+                      comments:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ManagedComment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /prayer-wall/manage/comments/{id}:
+    parameters:
+      - $ref: "#/components/parameters/CommentIdNamedId"
+    get:
+      tags: [Prayer Wall Moderation]
+      summary: Get a comment for moderation
+      responses:
+        "200":
+          description: Managed comment detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [comment]
+                properties:
+                  comment:
+                    $ref: "#/components/schemas/ManagedComment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Prayer Wall Moderation]
+      summary: Remove a comment from the public feed
+      requestBody:
+        $ref: "#/components/requestBodies/ModerationReason"
+      responses:
+        "200":
+          description: Updated managed comment.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, comment]
+                properties:
+                  message:
+                    type: string
+                  comment:
+                    $ref: "#/components/schemas/ManagedComment"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /prayer-wall/manage/comments/{id}/restore:
+    patch:
+      tags: [Prayer Wall Moderation]
+      summary: Restore a removed comment
+      parameters:
+        - $ref: "#/components/parameters/CommentIdNamedId"
+      responses:
+        "200":
+          description: Restored managed comment.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, comment]
+                properties:
+                  message:
+                    type: string
+                  comment:
+                    $ref: "#/components/schemas/ManagedComment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /subscriptions:
+    post:
+      tags: [Subscriptions]
+      summary: Create a one-time or recurring Checkout session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubscriptionCheckoutRequest"
+      responses:
+        "201":
+          description: Stripe Checkout session created or returned idempotently.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/SubscriptionRateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /subscriptions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/SubscriptionId"
+    get:
+      tags: [Subscriptions]
+      summary: Get a recurring subscription and access state
+      responses:
+        "200":
+          description: Sanitized subscription status without Stripe identifiers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/SubscriptionRateLimited"
+    patch:
+      tags: [Subscriptions]
+      summary: Change an active recurring subscription immediately; one-time commitments are not manageable here.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSubscriptionRequest"
+      responses:
+        "200":
+          description: Subscription was unchanged or this update was already confirmed by a subscription webhook.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionUpdateResponse"
+        "202":
+          description: Update awaits a subscription webhook, optionally requiring customer action in Stripe Billing Portal.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionUpdateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/SubscriptionRateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags: [Subscriptions]
+      summary: Cancel a recurring subscription immediately; one-time commitments are not cancellable here.
+      description: Immediately requests Stripe cancellation without refunds or proration. Local state awaits customer.subscription.deleted, or checkout.session.expired for open Checkout. Failed requests are retried by billing maintenance.
+      responses:
+        "200":
+          description: Subscription and future Stripe billing cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionCancellationResponse"
+        "202":
+          description: Cancellation was requested but Stripe has not yet confirmed a terminal state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionCancellationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/SubscriptionRateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /subscriptions/{id}/billing-portal:
+    post:
+      tags: [Subscriptions]
+      summary: Create a Stripe Billing Portal session
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionId"
+      responses:
+        "201":
+          description: Short-lived Stripe Billing Portal URL.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/SubscriptionRateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /health:
+    get:
+      tags: [System]
+      summary: Check API health
+      security: []
+      servers:
+        - url: http://localhost:3001
+      responses:
+        "200":
+          description: API is available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Sign in with an email address and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authentication succeeded without two-factor verification.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthenticatedSession"
+        "202":
+          description: Two-factor verification is required before tokens are issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TwoFactorChallenge"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/verify-2fa:
+    post:
+      tags: [Authentication]
+      summary: Complete a two-factor sign-in challenge
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyTwoFactorRequest"
+      responses:
+        "200":
+          description: Verification succeeded and tokens were issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthenticatedSession"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Rotate a refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          description: A new access and refresh-token pair.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPairResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke a refresh token
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessMessage"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /auth/profile:
+    get:
+      tags: [Authentication]
+      summary: Get the authenticated user's profile
+      responses:
+        "200":
+          description: Current user profile.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/2fa/enable:
+    post:
+      tags: [Authentication]
+      summary: Enable email two-factor authentication
+      responses:
+        "200":
+          $ref: "#/components/responses/UserMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/2fa/disable:
+    post:
+      tags: [Authentication]
+      summary: Disable email two-factor authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordConfirmationRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/UserMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/invite:
+    get:
+      tags: [Authentication]
+      summary: Inspect an invitation before accepting it
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Valid invitation details.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [invitation]
+                properties:
+                  invitation:
+                    $ref: "#/components/schemas/InvitationPreview"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /auth/forgot-password:
+    post:
+      tags: [Authentication]
+      summary: Request a password-reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /auth/reset-password:
+    post:
+      tags: [Authentication]
+      summary: Reset a password using a reset token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /auth/accept-invite:
+    post:
+      tags: [Authentication]
+      summary: Create an account from a valid invitation
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptInvitationRequest"
+      responses:
+        "200":
+          description: Invitation accepted and a session created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthenticatedSession"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /users:
+    get:
+      tags: [Users]
+      summary: List users
+      description: Admin-only.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/UserListLimit"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Role"
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, firstName, lastName, email, role, isActive, lastLoginAt]
+            default: createdAt
+        - $ref: "#/components/parameters/SortOrderDesc"
+      responses:
+        "200":
+          description: Paginated users.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Users]
+      summary: Create a user
+      description: Admin-only. Submit `profilePictureUrl` as an optional image file, despite the historical field name.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/UserMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      tags: [Users]
+      summary: Get a user
+      description: Admin-only.
+      responses:
+        "200":
+          description: User profile.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Users]
+      summary: Update a user
+      description: Admin-only. Submit `profilePictureUrl` as an optional replacement image file.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/UserMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Users]
+      summary: Request user deletion
+      description: Admin-only. Immediately deactivates and hides the user, then permanently deletes the record only after Stripe confirms all subscriptions are terminal. An administrator cannot delete their own account.
+      responses:
+        "200":
+          description: The user was permanently deleted because all associated subscriptions were already terminal.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDeletionResponse"
+        "202":
+          description: Deletion is pending Stripe cancellation confirmation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDeletionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /users/{id}/resend-invite:
+    post:
+      tags: [Users]
+      summary: Resend a user's invitation
+      description: Admin-only.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendInvitationRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/UserMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /users/{id}/badges:
+    get:
+      tags: [Users]
+      summary: List a user's active badge progress
+      description: Any authenticated user can access the route; the handler permits access to the current user's badges.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Active badge definitions with the user's earned state.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserBadge"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /invitations:
+    get:
+      tags: [Invitations]
+      summary: List invitations visible to the caller
+      description: Paginated invitation-management view available to administrators and family users.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Search"
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, accepted, expired, revoked] }
+        - name: role
+          in: query
+          schema: { type: string, enum: [admin, family, friend] }
+        - name: deliveryStatus
+          in: query
+          schema: { type: string, enum: [pending, sent, failed] }
+        - name: sortBy
+          in: query
+          schema: { type: string, enum: [createdAt, updatedAt, email, status, expiresAt], default: createdAt }
+        - $ref: "#/components/parameters/SortOrderDesc"
+      responses:
+        "200":
+          description: Paginated invitations.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitationPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Invitations]
+      summary: Send an invitation
+      description: Available to administrators and family users. Family users can invite friends only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvitationRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/InvitationMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /invitations/{id}/resend:
+    post:
+      tags: [Invitations]
+      summary: Resend an invitation
+      description: Available to administrators and family users.
+      parameters:
+        - $ref: "#/components/parameters/InvitationId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendInvitationRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/InvitationMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /invitations/{id}/revoke:
+    post:
+      tags: [Invitations]
+      summary: Revoke an invitation
+      description: Admin-only.
+      parameters:
+        - $ref: "#/components/parameters/InvitationId"
+      responses:
+        "200":
+          $ref: "#/components/responses/InvitationMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /logs:
+    get:
+      tags: [Audit Logs]
+      summary: List audit-log entries
+      description: Admin-only.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/UserListLimit"
+        - name: userId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: entityName
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: entityId
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: action
+          in: query
+          schema: { type: string, maxLength: 50 }
+        - name: startDate
+          in: query
+          schema: { type: string, format: date-time }
+        - name: endDate
+          in: query
+          schema: { type: string, format: date-time }
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, action, entityName]
+            default: createdAt
+        - $ref: "#/components/parameters/SortOrderDesc"
+      responses:
+        "200":
+          description: Paginated audit history.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /ministry-tracks:
+    get:
+      tags: [Ministry Tracks]
+      summary: List ministry tracks
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/UserListLimit"
+        - $ref: "#/components/parameters/Search"
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, isActive, Alphabetical, current_metric_level, target_metric_level, min_monthly_contribution]
+            default: createdAt
+        - name: sortOrder
+          in: query
+          schema: { type: string, enum: [ASC, DESC], default: ASC }
+      responses:
+        "200":
+          description: Paginated ministry tracks.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MinistryTrackPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Ministry Tracks]
+      summary: Create a ministry track
+      description: Admin-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMinistryTrackRequest"
+      responses:
+        "201":
+          description: Ministry track created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MinistryTrack"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /ministry-tracks/{id}:
+    parameters:
+      - $ref: "#/components/parameters/MinistryTrackId"
+    get:
+      tags: [Ministry Tracks]
+      summary: Get a ministry track
+      responses:
+        "200":
+          description: Ministry track.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MinistryTrack"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Ministry Tracks]
+      summary: Update a ministry track
+      description: Admin-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMinistryTrackRequest"
+      responses:
+        "200":
+          description: Updated ministry track.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MinistryTrack"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Ministry Tracks]
+      summary: Delete a ministry track
+      description: Admin-only.
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /ministry-tracks/{id}/commitments:
+    get:
+      tags: [Ministry Tracks]
+      summary: List durable one-time and recurring commitments for a ministry track
+      description: Returns completed one-time payment history and recurring commitment records. One-time commitments remain visible after confirmation; recurring access is still controlled by the subscription membership projection. Admin-only.
+      parameters:
+        - $ref: "#/components/parameters/MinistryTrackId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/UserListLimit"
+      responses:
+        "200":
+          description: Ministry-track commitment records.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MinistryTrackCommitments"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /announcements:
+    get:
+      tags: [Announcements]
+      summary: List announcements visible on the caller's dashboard
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Current published announcements available to the caller.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Announcements]
+      summary: Create an announcement
+      description: Admin-only. Draft or published announcements can target all users, roles, or ministry tracks.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAnnouncementRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/AnnouncementMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /announcements/manage:
+    get:
+      tags: [Announcements]
+      summary: List announcements for management
+      description: Admin-only. Includes drafts, archived records, targeting metadata, and visibility state.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Search"
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, published, archived] }
+        - name: visibilityState
+          in: query
+          schema: { type: string, enum: [draft, scheduled, active, expired, archived] }
+        - name: audienceType
+          in: query
+          schema: { type: string, enum: [global, roles, tracks] }
+        - name: type
+          in: query
+          schema: { type: string, enum: [info, warning, urgent] }
+        - name: priority
+          in: query
+          schema: { type: string, enum: [low, normal, high] }
+        - name: role
+          in: query
+          schema: { type: string, enum: [admin, family, friend] }
+        - name: trackId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Paginated announcement-management list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedAnnouncementPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /announcements/{id}:
+    parameters:
+      - $ref: "#/components/parameters/AnnouncementId"
+    get:
+      tags: [Announcements]
+      summary: Get an announcement for management
+      description: Admin-only.
+      responses:
+        "200":
+          description: Announcement including management metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [announcement]
+                properties:
+                  announcement:
+                    $ref: "#/components/schemas/ManagedAnnouncement"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Announcements]
+      summary: Update an announcement
+      description: Admin-only. Archived announcements are immutable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAnnouncementRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/AnnouncementMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Announcements]
+      summary: Delete a draft announcement
+      description: Admin-only. Published and archived announcements cannot be deleted.
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /announcements/{id}/restore:
+    patch:
+      tags: [Announcements]
+      summary: Restore an archived announcement
+      description: Admin-only. Restores an archived announcement to published status while retaining its schedule and audience targeting.
+      parameters:
+        - $ref: "#/components/parameters/AnnouncementId"
+      responses:
+        "200":
+          $ref: "#/components/responses/AnnouncementMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List the authenticated user's notifications
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [all, unread, read]
+            default: all
+      responses:
+        "200":
+          description: Paginated user notification feed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationFeedPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /notifications/read-all:
+    patch:
+      tags: [Notifications]
+      summary: Mark all delivered notifications as read
+      responses:
+        "200":
+          description: Read-state update summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkAllNotificationsReadResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark a notification as read
+      parameters:
+        - $ref: "#/components/parameters/NotificationId"
+      responses:
+        "200":
+          description: Updated notification.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationFeedItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /notifications/manage:
+    get:
+      tags: [Notifications]
+      summary: List notifications for management
+      description: Admin-only.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Search"
+        - name: origin
+          in: query
+          schema: { type: string, enum: [admin, system] }
+        - name: audienceType
+          in: query
+          schema: { type: string, enum: [all, users, roles, tracks] }
+      responses:
+        "200":
+          description: Paginated notification-management list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedNotificationPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Notifications]
+      summary: Create and deliver an administrative notification
+      description: Admin-only. Exactly one target array is required for a users, roles, or tracks audience; no targets are allowed for all users.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAdminNotificationRequest"
+      responses:
+        "201":
+          description: Created notification and delivery statistics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedNotification"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /notifications/manage/{id}:
+    get:
+      tags: [Notifications]
+      summary: Get a notification for management
+      description: Admin-only.
+      parameters:
+        - $ref: "#/components/parameters/NotificationId"
+      responses:
+        "200":
+          description: Notification and delivery statistics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedNotification"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /testimonies:
+    get:
+      tags: [Testimonies]
+      summary: List testimonies visible in the caller's feed
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Paginated published testimony feed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestimonyPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Testimonies]
+      summary: Create a testimony
+      description: Admin-only. `coverImage` is an optional image upload.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateTestimonyRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/TestimonyMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /testimonies/manage:
+    get:
+      tags: [Testimonies]
+      summary: List testimonies for management
+      description: Admin-only.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Search"
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, published, archived] }
+        - name: visibilityState
+          in: query
+          schema: { type: string, enum: [draft, scheduled, active, expired, archived] }
+        - name: trackId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: global
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Paginated testimony-management list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedTestimonyPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /testimonies/{id}:
+    parameters:
+      - $ref: "#/components/parameters/TestimonyId"
+    get:
+      tags: [Testimonies]
+      summary: Get a testimony for management
+      description: Admin-only.
+      responses:
+        "200":
+          description: Testimony including management metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [testimony]
+                properties:
+                  testimony:
+                    $ref: "#/components/schemas/ManagedTestimony"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Testimonies]
+      summary: Update a testimony
+      description: Admin-only. `coverImage` is an optional replacement image upload.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UpdateTestimonyRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/TestimonyMessage"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Testimonies]
+      summary: Delete a testimony
+      description: Admin-only. Archived testimonies cannot be deleted.
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /webhooks:
+    post:
+      tags: [Webhooks]
+      summary: Receive a Stripe webhook
+      description: This endpoint requires Stripe's signature header and the unmodified JSON request body. It does not use bearer authentication.
+      security: []
+      parameters:
+        - name: stripe-signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Event effects and receipt committed transactionally, ignored as unsupported, or already processed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookReceipt"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    InvitationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MinistryTrackId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AnnouncementId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    NotificationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TestimonyId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SubscriptionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    BadgeId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    UserListLimit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 20
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+        maxLength: 200
+        default: ""
+    Role:
+      name: role
+      in: query
+      schema:
+        type: string
+        enum: [admin, family, friend]
+    SortOrderDesc:
+      name: sortOrder
+      in: query
+      schema:
+        type: string
+        enum: [ASC, DESC]
+        default: DESC
+    ModerationStatus:
+      name: status
+      in: query
+      schema:
+        type: string
+        enum: [visible, removed]
+    ThreadId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ThreadIdNamed:
+      name: threadId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CommentId:
+      name: commentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CommentIdNamedId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReactionType:
+      name: reactionType
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [like, join_prayer]
+  requestBodies:
+    ModerationReason:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [reason]
+            properties:
+              reason:
+                type: string
+                minLength: 1
+                maxLength: 500
+  responses:
+    SuccessMessage:
+      description: Operation completed successfully.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message]
+            properties:
+              message:
+                type: string
+    ValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: A valid access token is required.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: The authenticated user lacks permission.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: The requested content was not found or is not visible.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: The requested state transition has already occurred.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServerError:
+      description: An unexpected server error occurred.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    SubscriptionRateLimited:
+      description: The authenticated user exceeded the subscription-operation rate limit. Retry after the interval indicated by the response headers.
+      headers:
+        RateLimit-Limit:
+          schema:
+            type: integer
+        RateLimit-Remaining:
+          schema:
+            type: integer
+        RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error, code]
+            properties:
+              error:
+                type: string
+              code:
+                type: string
+                enum: [SUBSCRIPTION_RATE_LIMITED]
+    UserMessage:
+      description: User operation completed successfully.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message, user]
+            properties:
+              message:
+                type: string
+              user:
+                $ref: "#/components/schemas/User"
+              expiresAt:
+                type: string
+                format: date-time
+    InvitationMessage:
+      description: Invitation operation completed successfully.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message, invitation]
+            properties:
+              message:
+                type: string
+              invitation:
+                $ref: "#/components/schemas/Invitation"
+    AnnouncementMessage:
+      description: Announcement operation completed successfully.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message, announcement]
+            properties:
+              message:
+                type: string
+              announcement:
+                $ref: "#/components/schemas/ManagedAnnouncement"
+    TestimonyMessage:
+      description: Testimony operation completed successfully.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message, testimony]
+            properties:
+              message:
+                type: string
+              testimony:
+                $ref: "#/components/schemas/ManagedTestimony"
+  schemas:
+    CreateSubscriptionCheckoutRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - subscriptionAmount
+        - subscriptionCurrency
+        - ministryTrackId
+        - idempotencyKey
+        - subscriptionType
+      properties:
+        subscriptionAmount:
+          type: integer
+          minimum: 1
+          maximum: 999999
+          description: Whole USD amount; yearly subscriptions must meet twelve times the track monthly minimum.
+        subscriptionCurrency:
+          type: string
+          enum: [usd]
+        ministryTrackId:
+          type: string
+          format: uuid
+        idempotencyKey:
+          type: string
+          format: uuid
+        subscriptionType:
+          type: string
+          enum: [one-time, recurring]
+        interval:
+          type: string
+          enum: [month, year]
+          description: Required for recurring requests and forbidden for one-time requests.
+    UpdateSubscriptionRequest:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey]
+      properties:
+        subscriptionAmount:
+          type: integer
+          minimum: 1
+          maximum: 999999
+        interval:
+          type: string
+          enum: [month, year]
+        idempotencyKey:
+          type: string
+          format: uuid
+    CheckoutResponse:
+      type: object
+      required: [paymentRequestId, commitmentId, subscriptionId, checkout, status]
+      properties:
+        paymentRequestId:
+          type: string
+          format: uuid
+        commitmentId:
+          type: string
+          format: uuid
+          description: Durable commitment created for this one-time or recurring checkout.
+        subscriptionId:
+          type: string
+          format: uuid
+          nullable: true
+        checkout:
+          type: object
+          required: [url]
+          properties:
+            url:
+              type: string
+              format: uri
+        status:
+          type: string
+          enum: [pending, completed, failed, expired]
+    SubscriptionStatus:
+      type: object
+      required:
+        - id
+        - ministryTrackId
+        - amount
+        - currency
+        - interval
+        - subscriptionStatus
+        - accessStatus
+        - cancellation
+        - billingReviewStatus
+      properties:
+        id:
+          type: string
+          format: uuid
+        ministryTrackId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          nullable: true
+          description: Confirmed amount in whole USD; null before the initial subscription confirmation.
+        currency:
+          type: string
+          nullable: true
+        interval:
+          type: string
+          nullable: true
+          enum: [month, year, null]
+        subscriptionStatus:
+          type: string
+          enum: [pending, incomplete, incomplete_expired, trialing, active, past_due, unpaid, paused, canceled]
+        accessStatus:
+          type: string
+          enum: [pending, active, grace, inactive, cancelled]
+        currentPeriodEnd:
+          type: string
+          format: date-time
+          nullable: true
+        cancellation:
+          type: object
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [none, pending, scheduled, cancelled]
+            requestedAt:
+              type: string
+              format: date-time
+              nullable: true
+            scheduledAt:
+              type: string
+              format: date-time
+              nullable: true
+            effectiveAt:
+              type: string
+              format: date-time
+              nullable: true
+            cancelledAt:
+              type: string
+              format: date-time
+              nullable: true
+        billingReviewStatus:
+          type: string
+          enum: [none, dispute_open, dispute_won, dispute_lost]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    SubscriptionUpdateResponse:
+      oneOf:
+        - type: object
+          required: [status, subscriptionId]
+          properties:
+            status:
+              type: string
+              enum: [pending]
+            subscriptionId:
+              type: string
+              format: uuid
+        - type: object
+          required: [status, subscription]
+          properties:
+            status:
+              type: string
+              enum: [unchanged, updated]
+            subscription:
+              $ref: "#/components/schemas/SubscriptionStatus"
+        - type: object
+          required: [status, subscriptionId, portalUrl]
+          properties:
+            status:
+              type: string
+              enum: [requires_action]
+            subscriptionId:
+              type: string
+              format: uuid
+            portalUrl:
+              type: string
+              format: uri
+    SubscriptionCancellationResponse:
+      type: object
+      required: [status, subscription]
+      properties:
+        status:
+          type: string
+          enum: [cancelled, cancellation_pending]
+        subscription:
+          $ref: "#/components/schemas/SubscriptionStatus"
+        errorCode:
+          type: string
+          nullable: true
+          description: Present when the cancellation remains pending because the provider could not be confirmed.
+    UserDeletionCancellationSummary:
+      type: object
+      required: [requested, confirmed, pending, deletionFinalized]
+      properties:
+        requested:
+          type: integer
+          minimum: 0
+        confirmed:
+          type: integer
+          minimum: 0
+        pending:
+          type: integer
+          minimum: 0
+        deletionFinalized:
+          type: boolean
+    UserDeletionResponse:
+      type: object
+      required: [message, deletionStatus, operationId, cancellation]
+      properties:
+        message:
+          type: string
+        deletionStatus:
+          type: string
+          enum: [deleted, pending_cancellation]
+        operationId:
+          type: string
+          format: uuid
+        cancellation:
+          $ref: "#/components/schemas/UserDeletionCancellationSummary"
+    WebhookReceipt:
+      type: object
+      required: [received]
+      properties:
+        received:
+          type: boolean
+          enum: [true]
+        ignored:
+          type: boolean
+          description: True when the Stripe event type is not handled by this API.
+        duplicate:
+          type: boolean
+          description: True when the same Stripe event ID had already been processed and committed.
+        status:
+          type: string
+          enum: [processed]
+    Badge:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - description
+        - order
+        - triggerKey
+        - requirementConfig
+        - isActive
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          maxLength: 100
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 2000
+        order:
+          type: integer
+          minimum: 0
+        triggerKey:
+          type: string
+          enum: [ministry.track.duration, action.login, action.donation]
+        requirementConfig:
+          type: object
+          additionalProperties: true
+          description: Trigger-specific configuration validated by the badge trigger registry.
+        isActive:
+          type: boolean
+        definitionLockedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateBadgeRequest:
+      type: object
+      additionalProperties: false
+      required: [code, name, description, triggerKey, requirementConfig]
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 100
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        order:
+          type: integer
+          minimum: 0
+          default: 0
+        triggerKey:
+          type: string
+          enum: [ministry.track.duration, action.login, action.donation]
+        requirementConfig:
+          type: object
+          additionalProperties: true
+        isActive:
+          type: boolean
+          default: true
+    UpdateBadgeRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 100
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        order:
+          type: integer
+          minimum: 0
+        triggerKey:
+          type: string
+          enum: [ministry.track.duration, action.login, action.donation]
+        requirementConfig:
+          type: object
+          additionalProperties: true
+        isActive:
+          type: boolean
+    BadgePage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [badges]
+          properties:
+            badges:
+              type: array
+              items:
+                $ref: "#/components/schemas/Badge"
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          description: Stable machine-readable code supplied for selected application and database errors.
+        details:
+          oneOf:
+            - type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+            - type: object
+              additionalProperties: true
+    Pagination:
+      type: object
+      required: [total, page, limit, totalPages]
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+    PublicAuthor:
+      type: object
+      nullable: true
+      required: [id, firstName, profilePictureUrl]
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+          nullable: true
+        username:
+          type: string
+          nullable: true
+        profilePictureUrl:
+          type: string
+          format: uri
+          nullable: true
+    ReactionSummary:
+      type: object
+      required: [likeCount, joinPrayerCount, viewerHasLiked, viewerHasJoinedPrayer]
+      properties:
+        likeCount:
+          type: integer
+          minimum: 0
+        joinPrayerCount:
+          type: integer
+          minimum: 0
+        viewerHasLiked:
+          type: boolean
+        viewerHasJoinedPrayer:
+          type: boolean
+    PrayerWallThread:
+      type: object
+      required:
+        - id
+        - type
+        - body
+        - isAnonymous
+        - author
+        - reactions
+        - commentCount
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [prayer, praise]
+        body:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        isAnonymous:
+          type: boolean
+        author:
+          $ref: "#/components/schemas/PublicAuthor"
+        authorDisplayName:
+          type: string
+          nullable: true
+          description: Anonymous for anonymous content; otherwise null.
+        reactions:
+          $ref: "#/components/schemas/ReactionSummary"
+        commentCount:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PrayerWallComment:
+      type: object
+      required: [id, threadId, body, isAnonymous, author, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        threadId:
+          type: string
+          format: uuid
+        body:
+          type: string
+          minLength: 1
+          maxLength: 500
+        isAnonymous:
+          type: boolean
+        author:
+          $ref: "#/components/schemas/PublicAuthor"
+        authorDisplayName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateThreadRequest:
+      type: object
+      additionalProperties: false
+      required: [type, body]
+      properties:
+        type:
+          type: string
+          enum: [prayer, praise]
+        body:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        isAnonymous:
+          type: boolean
+          default: false
+    CreateCommentRequest:
+      type: object
+      additionalProperties: false
+      required: [body]
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 500
+        isAnonymous:
+          type: boolean
+          default: false
+    ThreadPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [threads]
+          properties:
+            threads:
+              type: array
+              items:
+                $ref: "#/components/schemas/PrayerWallThread"
+    CommentPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [comments]
+          properties:
+            comments:
+              type: array
+              items:
+                $ref: "#/components/schemas/PrayerWallComment"
+    ModerationFields:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [visible, removed]
+        removedAt:
+          type: string
+          format: date-time
+          nullable: true
+        removalReason:
+          type: string
+          nullable: true
+        removalSource:
+          type: string
+          enum: [author, moderator]
+          nullable: true
+        removedBy:
+          type: object
+          nullable: true
+          additionalProperties: true
+    ManagedThread:
+      allOf:
+        - $ref: "#/components/schemas/PrayerWallThread"
+        - $ref: "#/components/schemas/ModerationFields"
+    ManagedComment:
+      allOf:
+        - $ref: "#/components/schemas/PrayerWallComment"
+        - $ref: "#/components/schemas/ModerationFields"
+        - type: object
+          properties:
+            thread:
+              type: object
+              nullable: true
+              additionalProperties: true
+    ManagedCommentPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [comments]
+          properties:
+            comments:
+              type: array
+              items:
+                $ref: "#/components/schemas/ManagedComment"
+    HealthStatus:
+      type: object
+      required: [status, service, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    User:
+      type: object
+      required:
+        - id
+        - firstName
+        - email
+        - role
+        - twoFactorEnabled
+        - isActive
+        - hasPassword
+        - invitationPending
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+          maxLength: 50
+        lastName:
+          type: string
+          maxLength: 50
+          nullable: true
+        username:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, family, friend]
+        twoFactorEnabled:
+          type: boolean
+        profilePictureUrl:
+          type: string
+          format: uri
+          nullable: true
+        isActive:
+          type: boolean
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        hasPassword:
+          type: boolean
+        invitationPending:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UserSummary:
+      type: object
+      required: [id, firstName, email]
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    VerifyTwoFactorRequest:
+      type: object
+      additionalProperties: false
+      required: [tokenId, code]
+      properties:
+        tokenId:
+          type: string
+          format: uuid
+        code:
+          type: string
+          pattern: "^\\d{6}$"
+    RefreshTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    PasswordConfirmationRequest:
+      type: object
+      additionalProperties: false
+      required: [password]
+      properties:
+        password:
+          type: string
+    ForgotPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    ResetPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [token, password]
+      properties:
+        token:
+          type: string
+        password:
+          $ref: "#/components/schemas/Password"
+    AcceptInvitationRequest:
+      type: object
+      additionalProperties: false
+      required: [token, invitedFirstName, invitedLastName, firstName, lastName, password]
+      properties:
+        token:
+          type: string
+        invitedFirstName:
+          type: string
+          minLength: 1
+          maxLength: 50
+        invitedLastName:
+          type: string
+          minLength: 1
+          maxLength: 50
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 50
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 50
+        password:
+          $ref: "#/components/schemas/Password"
+    Password:
+      type: string
+      minLength: 8
+      maxLength: 128
+      pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)"
+      description: Must contain lowercase and uppercase letters and a number.
+    TokenPairResponse:
+      type: object
+      required: [message, accessToken, refreshToken]
+      properties:
+        message:
+          type: string
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+    AuthenticatedSession:
+      allOf:
+        - $ref: "#/components/schemas/TokenPairResponse"
+        - type: object
+          required: [user]
+          properties:
+            user:
+              $ref: "#/components/schemas/User"
+    TwoFactorChallenge:
+      type: object
+      required: [message, twoFactorRequired, tokenId, expiresAt]
+      properties:
+        message:
+          type: string
+        twoFactorRequired:
+          type: boolean
+          enum: [true]
+        tokenId:
+          type: string
+          format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+    InvitationPreview:
+      type: object
+      required: [email, invitedFirstName, invitedLastName, role, status, expiresAt]
+      properties:
+        email:
+          type: string
+          format: email
+        invitedFirstName:
+          type: string
+        invitedLastName:
+          type: string
+        role:
+          type: string
+          enum: [admin, family, friend]
+        status:
+          type: string
+          enum: [pending]
+        expiresAt:
+          type: string
+          format: date-time
+    CreateUserRequest:
+      type: object
+      additionalProperties: false
+      required: [firstName, email, password, role]
+      properties:
+        firstName:
+          type: string
+          maxLength: 50
+        lastName:
+          type: string
+          maxLength: 50
+          nullable: true
+        email:
+          type: string
+          format: email
+        password:
+          $ref: "#/components/schemas/Password"
+        role:
+          type: string
+          enum: [family, friend]
+        profilePictureUrl:
+          type: string
+          format: binary
+          description: Image upload field.
+    UpdateUserRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        firstName:
+          type: string
+          maxLength: 50
+        lastName:
+          type: string
+          maxLength: 50
+          nullable: true
+        email:
+          type: string
+          format: email
+        password:
+          $ref: "#/components/schemas/Password"
+        role:
+          type: string
+          enum: [admin, family, friend]
+        isActive:
+          type: boolean
+        profilePictureUrl:
+          type: string
+          format: binary
+          description: Replacement image upload field.
+    UserPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [message, users]
+          properties:
+            message:
+              type: string
+            users:
+              type: array
+              items:
+                $ref: "#/components/schemas/User"
+    UserBadge:
+      type: object
+      required: [id, code, name, description, order, earned]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        order:
+          type: integer
+        earned:
+          type: boolean
+    ResendInvitationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        expiresInHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+    Invitation:
+      type: object
+      required:
+        - id
+        - email
+        - invitedFirstName
+        - invitedLastName
+        - role
+        - inviterId
+        - status
+        - expiresAt
+        - deliveryStatus
+        - resendCount
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        invitedFirstName:
+          type: string
+        invitedLastName:
+          type: string
+        role:
+          type: string
+          enum: [admin, family, friend]
+        inviterId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, accepted, expired, revoked]
+        expiresAt:
+          type: string
+          format: date-time
+        acceptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deliveryStatus:
+          type: string
+          enum: [pending, sent, failed]
+        deliveryAttemptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deliveryFailureReason:
+          type: string
+          nullable: true
+        resendCount:
+          type: integer
+          minimum: 0
+        acceptedUserId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    InvitationPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [invitations]
+          properties:
+            invitations:
+              type: array
+              items:
+                $ref: "#/components/schemas/Invitation"
+    CreateInvitationRequest:
+      type: object
+      additionalProperties: false
+      required: [email, firstName, lastName]
+      properties:
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 50
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 50
+        role:
+          type: string
+          enum: [admin, family, friend]
+        expiresInHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+    AuditLog:
+      type: object
+      required: [id, action, entityName, entityId, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+        entityName:
+          type: string
+        entityId:
+          type: string
+        oldValues:
+          type: object
+          nullable: true
+          additionalProperties: true
+        newValues:
+          type: object
+          nullable: true
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          allOf:
+            - $ref: "#/components/schemas/UserSummary"
+          nullable: true
+    AuditLogPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [message, logs]
+          properties:
+            message:
+              type: string
+            logs:
+              type: array
+              items:
+                $ref: "#/components/schemas/AuditLog"
+    MinistryTrack:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - isActive
+        - current_metric_level
+        - target_metric_level
+        - min_monthly_contribution
+        - cost_per_unit
+        - metricUnit
+        - target_period
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 100
+        order:
+          type: integer
+        cover_url:
+          type: string
+          format: uri
+          nullable: true
+        description:
+          type: string
+          maxLength: 500
+        current_metric_level:
+          type: number
+          format: double
+        target_metric_level:
+          type: integer
+        min_monthly_contribution:
+          type: integer
+        cost_per_unit:
+          type: integer
+        metricUnit:
+          type: string
+          enum: [souls, streams, usd, egp, houses built]
+        target_period:
+          type: string
+          enum: [Monthly, Quarterly, Annually]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateMinistryTrackRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - current_metric_level
+        - target_metric_level
+        - min_monthly_contribution
+        - cost_per_unit
+        - metricUnit
+        - target_period
+        - isActive
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        cover_url:
+          type: string
+          format: uri
+        current_metric_level:
+          type: number
+          multipleOf: 0.01
+        target_metric_level:
+          type: integer
+        min_monthly_contribution:
+          type: integer
+        cost_per_unit:
+          type: integer
+        metricUnit:
+          type: string
+          enum: [souls, streams, usd, egp, houses built]
+        target_period:
+          type: string
+          enum: [Monthly, Quarterly, Annually]
+        isActive:
+          type: boolean
+          default: true
+    UpdateMinistryTrackRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        cover_url:
+          type: string
+          format: uri
+        current_metric_level:
+          type: number
+          multipleOf: 0.01
+        target_metric_level:
+          type: integer
+        min_monthly_contribution:
+          type: integer
+        cost_per_unit:
+          type: integer
+        metricUnit:
+          type: string
+          enum: [souls, streams, usd, egp, houses built]
+        target_period:
+          type: string
+          enum: [Monthly, Quarterly, Annually]
+        isActive:
+          type: boolean
+    MinistryTrackPage:
+      type: object
+      required: [total, page, limit, ministryTracks]
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        ministryTracks:
+          type: array
+          items:
+            $ref: "#/components/schemas/MinistryTrack"
+    Commitment:
+      type: object
+      required: [id, userId, ministryTrackId, type, amountMinor, currency, status, createdAt, user, paymentRequests, subscription]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        ministryTrackId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [one-time, recurring]
+        amountMinor:
+          type: integer
+          description: Commitment amount in the currency's minor unit.
+        currency:
+          type: string
+        interval:
+          type: string
+          nullable: true
+          enum: [month, year, null]
+        status:
+          type: string
+          enum: [pending, active, completed, failed, cancelled]
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        user:
+          allOf:
+            - $ref: "#/components/schemas/UserSummary"
+          nullable: true
+        paymentRequests:
+          type: array
+          items:
+            type: object
+            required: [id, status]
+            properties:
+              id:
+                type: string
+                format: uuid
+              status:
+                type: string
+              stripeCheckoutSessionId:
+                type: string
+                nullable: true
+              stripePaymentIntentId:
+                type: string
+                nullable: true
+        subscription:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            stripeSubscriptionId:
+              type: string
+              nullable: true
+    MinistryTrackCommitments:
+      type: object
+      required: [page, limit, ministry_track, total_commitments, commitments]
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        ministry_track:
+          $ref: "#/components/schemas/MinistryTrack"
+        total_commitments:
+          type: integer
+        commitments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Commitment"
+    Announcement:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - type
+        - priority
+        - visibilityState
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        type:
+          type: string
+          enum: [info, warning, urgent]
+        priority:
+          type: string
+          enum: [low, normal, high]
+        visibilityState:
+          type: string
+          enum: [draft, scheduled, active, expired, archived]
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ManagedAnnouncement:
+      allOf:
+        - $ref: "#/components/schemas/Announcement"
+        - type: object
+          required: [status, audienceType, targetRoles, targetTrackIds]
+          properties:
+            status:
+              type: string
+              enum: [draft, published, archived]
+            audienceType:
+              type: string
+              enum: [global, roles, tracks]
+            archivedAt:
+              type: string
+              format: date-time
+              nullable: true
+            createdBy:
+              type: object
+              nullable: true
+              required: [id, firstName]
+              properties:
+                id: { type: string, format: uuid }
+                firstName: { type: string }
+                lastName: { type: string, nullable: true }
+            targetRoles:
+              type: array
+              items: { type: string, enum: [admin, family, friend] }
+            targetTrackIds:
+              type: array
+              items: { type: string, format: uuid }
+            targetTracks:
+              type: array
+              items:
+                type: object
+                required: [id, name, isActive]
+                properties:
+                  id: { type: string, format: uuid }
+                  name: { type: string }
+                  isActive: { type: boolean }
+    AnnouncementPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [announcements]
+          properties:
+            announcements:
+              type: array
+              items:
+                $ref: "#/components/schemas/Announcement"
+    ManagedAnnouncementPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [announcements]
+          properties:
+            announcements:
+              type: array
+              items:
+                $ref: "#/components/schemas/ManagedAnnouncement"
+    CreateAnnouncementRequest:
+      type: object
+      additionalProperties: false
+      required: [title, description, audienceType]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        type:
+          type: string
+          enum: [info, warning, urgent]
+          default: info
+        priority:
+          type: string
+          enum: [low, normal, high]
+          default: normal
+        status:
+          type: string
+          enum: [draft, published]
+          default: draft
+        audienceType:
+          type: string
+          enum: [global, roles, tracks]
+        targetRoles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [admin, family, friend] }
+        targetTrackIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+      description: For `global`, omit both target arrays. For `roles` provide only targetRoles; for `tracks` provide only targetTrackIds.
+    UpdateAnnouncementRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        type:
+          type: string
+          enum: [info, warning, urgent]
+        priority:
+          type: string
+          enum: [low, normal, high]
+        status:
+          type: string
+          enum: [draft, published, archived]
+        audienceType:
+          type: string
+          enum: [global, roles, tracks]
+        targetRoles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [admin, family, friend] }
+        targetTrackIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+      description: Target-array requirements follow the resulting audienceType.
+    NotificationFeedItem:
+      type: object
+      required: [id, title, body, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+    NotificationFeedPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [notifications, unreadCount]
+          properties:
+            notifications:
+              type: array
+              items:
+                $ref: "#/components/schemas/NotificationFeedItem"
+            unreadCount:
+              type: integer
+              minimum: 0
+    MarkAllNotificationsReadResponse:
+      type: object
+      required: [updatedCount, readAt]
+      properties:
+        updatedCount:
+          type: integer
+          minimum: 0
+        readAt:
+          type: string
+          format: date-time
+    CreateAdminNotificationRequest:
+      type: object
+      additionalProperties: false
+      required: [title, body, audienceType]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        body:
+          type: string
+          minLength: 1
+          maxLength: 500
+        audienceType:
+          type: string
+          enum: [all, users, roles, tracks]
+        targetUserIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        targetRoles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [admin, family, friend] }
+        targetTrackIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, format: uuid }
+      description: For `all`, omit all target arrays. For any other audience type, provide only its matching target array.
+    ManagedNotification:
+      type: object
+      required:
+        - id
+        - title
+        - body
+        - origin
+        - audienceType
+        - targetCriteria
+        - createdAt
+        - recipientCount
+        - readCount
+        - unreadCount
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        body:
+          type: string
+        origin:
+          type: string
+          enum: [admin, system]
+        audienceType:
+          type: string
+          enum: [all, users, roles, tracks]
+        targetCriteria:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          allOf:
+            - $ref: "#/components/schemas/UserSummary"
+          nullable: true
+        recipientCount:
+          type: integer
+          minimum: 0
+        readCount:
+          type: integer
+          minimum: 0
+        unreadCount:
+          type: integer
+          minimum: 0
+        source:
+          type: object
+          nullable: true
+          required: [type, id]
+          properties:
+            type: { type: string }
+            id: { type: string }
+    ManagedNotificationPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [notifications]
+          properties:
+            notifications:
+              type: array
+              items:
+                $ref: "#/components/schemas/ManagedNotification"
+    Testimony:
+      type: object
+      required:
+        - id
+        - quote
+        - authorName
+        - visibilityState
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        quote:
+          type: string
+          maxLength: 5000
+        authorName:
+          type: string
+          maxLength: 100
+        authorLocation:
+          type: string
+          maxLength: 150
+          nullable: true
+        testimonyDate:
+          type: string
+          format: date
+          nullable: true
+        coverImageUrl:
+          type: string
+          format: uri
+          nullable: true
+        track:
+          type: object
+          nullable: true
+          required: [id, name, isActive]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            isActive: { type: boolean }
+        visibilityState:
+          type: string
+          enum: [draft, scheduled, active, expired, archived]
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ManagedTestimony:
+      allOf:
+        - $ref: "#/components/schemas/Testimony"
+        - type: object
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [draft, published, archived]
+            archivedAt:
+              type: string
+              format: date-time
+              nullable: true
+            createdBy:
+              type: object
+              nullable: true
+              required: [id, firstName]
+              properties:
+                id: { type: string, format: uuid }
+                firstName: { type: string }
+                lastName: { type: string, nullable: true }
+    CreateTestimonyRequest:
+      type: object
+      additionalProperties: false
+      required: [quote, authorName]
+      properties:
+        quote:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        authorName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        authorLocation:
+          type: string
+          maxLength: 150
+          nullable: true
+        testimonyDate:
+          type: string
+          format: date-time
+          nullable: true
+        ministryTrackId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published]
+          default: draft
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+        coverImage:
+          type: string
+          format: binary
+    UpdateTestimonyRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        quote:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        authorName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        authorLocation:
+          type: string
+          maxLength: 150
+          nullable: true
+        testimonyDate:
+          type: string
+          format: date-time
+          nullable: true
+        ministryTrackId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, archived]
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+        coverImageUrl:
+          type: string
+          nullable: true
+          description: Set to an empty string or null to remove the current image.
+        coverImage:
+          type: string
+          format: binary
+    TestimonyPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [testimonies]
+          properties:
+            testimonies:
+              type: array
+              items:
+                $ref: "#/components/schemas/Testimony"
+    ManagedTestimonyPage:
+      allOf:
+        - $ref: "#/components/schemas/Pagination"
+        - type: object
+          required: [testimonies]
+          properties:
+            testimonies:
+              type: array
+              items:
+                $ref: "#/components/schemas/ManagedTestimony"

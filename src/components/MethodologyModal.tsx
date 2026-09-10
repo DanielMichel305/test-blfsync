@@ -3,63 +3,22 @@ import { useLanguage } from '../LanguageContext';
 import React from 'react';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import type { Track } from '../types';
 
 interface MethodologyModalProps {
  isOpen: boolean;
  onClose: () => void;
  highlightTrackId?: string | null;
+ tracks: Track[];
 }
 
 export const MethodologyModal: React.FC<MethodologyModalProps> = ({
  isOpen,
  onClose,
- highlightTrackId = null
+ highlightTrackId = null,
+ tracks,
 }) => {
  const { t, language } = useLanguage();
-  const tracksInfo = [
-    {
-      id: 'general-fund',
-      name: 'General Fund',
-      cost: '3.39 EGP',
-      unit: 'soul sowed',
-      description: 'The general fund represents the averaged impact across all active ministry tracks combined, allowing sowed resources to be sowed dynamically to the areas of greatest spiritual need.'
-    },
-    {
-      id: 'gospel-reach',
-      name: 'Evangelism',
-      cost: '33.33 EGP',
-      unit: 'person receiving the Gospel',
-      description: 'Seekers who receive a complete digital presentation of the Gospel message via targeted social media video campaigns, followed by one-on-one support from a trained follow-up team member.'
-    },
-    {
-      id: 'answer-search',
-      name: 'Faith Questions Answered',
-      cost: '2.00 EGP',
-      unit: 'question answered',
-      description: 'Direct apologetics and spiritual answers provided to curious seekers asking difficult theological questions online.'
-    },
-    {
-      id: 'believer-followup',
-      name: 'Discipleship Program',
-      cost: '150.00 EGP',
-      unit: 'person discipled',
-      description: 'New disciples placed into structured daily Bible reading plans with active spiritual mentorship.'
-    },
-    {
-      id: 'radio-ministry',
-      name: 'Radio Ministry',
-      cost: '0.83 EGP',
-      unit: 'radio session',
-      description: 'Spiritual programs and broadcasts delivered directly to remote village radios, homes, and transit vehicles.'
-    },
-    {
-      id: 'rallies',
-      name: 'Rallies: Youth, Women and Family',
-      cost: '40.00 EGP',
-      unit: 'person reached at rallies',
-      description: 'Youth and family attendees at physically organized live assemblies, local crusades, and community care rallies.'
-    }
-  ];
 
  if (!isOpen) return null;
 
@@ -91,7 +50,7 @@ export const MethodologyModal: React.FC<MethodologyModalProps> = ({
  </div>
  <h3 className="text-xl font-serif font-bold text-editorial-charcoal">{t("Conversion Methodology", "منهجية حساب الأثر")}</h3>
  <p className="text-[11px] text-editorial-charcoal/60 leading-relaxed">
- How sowed seeds in EGP directly fuel strategic media operations and translate to souls touched in the Middle East.
+ {t('How whole USD contributions translate into the metric defined by each ministry track.', 'كيف تتحول المساهمات بالدولار إلى المؤشر المحدد لكل مسار خدمة.')}
  </p>
  </div>
  <button
@@ -110,7 +69,7 @@ export const MethodologyModal: React.FC<MethodologyModalProps> = ({
  The Outreach Index
  </h4>
  <p className="text-xs text-editorial-charcoal/80 leading-relaxed font-serif italic">
- "Our calculations are strictly audited and directly bound to actual operating budgets. Your spiritual impact represents the accumulated sum of touchpoints sowed through your faith commitments."
+ {t('Estimated impact divides the contribution by the API cost-per-unit value. Progress compares the current metric level with the target metric level.', 'يقسم الأثر التقديري المساهمة على تكلفة الوحدة من الواجهة البرمجية. وتقارن نسبة التقدم المؤشر الحالي بالمؤشر المستهدف.')}
  </p>
  </div>
 
@@ -119,12 +78,12 @@ export const MethodologyModal: React.FC<MethodologyModalProps> = ({
  <h4 className="text-[10px] font-bold uppercase tracking-wider text-editorial-charcoal/55">{t("Track-by-Track Definitions", "تعريفات مسارات الخدمة")}</h4>
  
  <div className="grid grid-cols-1 gap-3">
- {tracksInfo.map((track) => {
- const isHighlighted = highlightTrackId === track.id;
+ {tracks.map((track) => {
+ const isHighlighted = highlightTrackId === track.track_id;
 
  return (
  <div
- key={track.id}
+ key={track.track_id}
  className={`p-4 rounded-lg border transition-all duration-300 relative overflow-hidden ${
  isHighlighted
  ? 'bg-editorial-soft/80 border-editorial-charcoal/30 shadow-xs'
@@ -139,13 +98,13 @@ export const MethodologyModal: React.FC<MethodologyModalProps> = ({
 
  <div className="space-y-1.5">
  <div className="flex items-center justify-between flex-wrap gap-x-2 border-b border-editorial-charcoal/5 pb-1">
- <h5 className="font-serif font-bold text-sm text-editorial-charcoal">{getLocalizedTrackName(track.id, track.name, language)}</h5>
+ <h5 className="font-serif font-bold text-sm text-editorial-charcoal">{getLocalizedTrackName(track.track_id, track.name, language)}</h5>
  <span className="font-serif font-bold text-sm text-editorial-charcoal">
- {track.unit}
+ ${track.cost_per_unit.toLocaleString()} USD / {getLocalizedTrackUnitLabel(track.track_id, track.target_unit_label, language)}
  </span>
  </div>
  <p className="text-xs text-editorial-charcoal/70 leading-relaxed font-serif italic pt-1">
- {getLocalizedTrackDesc(track.id, track.description, language)}
+ {getLocalizedTrackDesc(track.track_id, track.description, language)}
  </p>
  </div>
  </div>
@@ -158,7 +117,7 @@ export const MethodologyModal: React.FC<MethodologyModalProps> = ({
  {/* Footer */}
  <div className="p-4 border-t border-editorial-charcoal/10 bg-editorial-soft/30 flex items-center justify-between text-[10px] text-editorial-charcoal/60">
  <span className="font-serif italic text-editorial-charcoal/60">
- 100% of sowed seeds reach operational campaigns.
+ {t('Metric definitions and costs are supplied by the Better Life API.', 'تعريفات المؤشرات والتكاليف مقدمة من واجهة الحياة الأفضل.')}
  </span>
  <button
  onClick={onClose}
