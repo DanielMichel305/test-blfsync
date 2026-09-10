@@ -1,6 +1,6 @@
 # Better Life API integration status
 
-This report reconciles the implementation with `API_INTEGRATION_CHECKLIST.md`. The OpenAPI document remains the contract source of truth.
+This report reconciles the implementation with `API_INTEGRATION_CHECKLIST.md` and the backend update received as `openapi copy.yaml`. The updated OpenAPI document remains the contract source of truth.
 
 ## Baseline visual record
 
@@ -13,7 +13,7 @@ The integration preserves the established typography, card/modal styling, header
 ### 1. Baseline and contract — complete
 
 - Installed TanStack Query and `openapi-typescript`.
-- Added `npm run generate:api`; generated `src/api/generated.ts` from `openapi.yaml`.
+- Added `npm run generate:api`; generated `src/api/generated.ts` from the backend-provided `openapi copy.yaml`.
 - Added `VITE_API_BASE_URL` configuration with a `http://localhost:3001/v1` default and `.env.example`.
 - Checklist deviation realigned: the checklist's same-origin `/v1` default was superseded by the confirmed separate API host at `localhost:3001`; the OpenAPI server and runtime client now use the same absolute base URL.
 - Deviation corrected: `openapi.yaml` had two `description` keys on the ministry-track commitments operation. They were merged without changing behavior so generation could succeed.
@@ -21,7 +21,7 @@ The integration preserves the established typography, card/modal styling, header
 ### 2. API access layer — complete
 
 - `src/api/client.ts` centralizes JSON/multipart calls, bearer injection, normalized errors, one automatic refresh/retry, and failed-session cleanup.
-- `src/api/domains.ts` covers authentication/profile/2FA, tracks, checkouts/subscriptions, prayer wall/moderation, notifications/admin notifications, users, invitations, logs, announcements, testimonies, and badges.
+- `src/api/domains.ts` covers authentication/profile/2FA, tracks, authenticated and guest checkouts, commitments, payments, prayer wall/moderation, notifications, users, invitations, referrals, logs, announcements, testimonies, badges, public content, field updates, and contact inquiries.
 - No application client calls `/webhooks`.
 
 ### 3. TanStack Query — complete
@@ -47,31 +47,31 @@ The integration preserves the established typography, card/modal styling, header
 
 ### 6. Donor flows — complete within the documented contract
 
-- Tracks load through Query after authentication; public unauthenticated loading remains excluded.
+- Tracks, announcements, and testimonies load from the public endpoints before authentication and their authenticated counterparts after login.
 - Checkout posts whole USD values, a new UUID idempotency key, exact subscription type/interval/track fields, and redirects to the returned Stripe URL.
 - The payment UI contains no card, wallet, Fawry, or locally stored transaction data.
 - Prayer threads, filters, pagination, comments, reactions, counts/viewer state, and owned deletion are API-backed.
 - Notifications use the API feed/unread count and read mutations.
-- Recurring detail/update/cancel/portal hooks exist for screens that receive a subscription ID. A user subscription list cannot be shown after reload because no listing endpoint is documented.
+- Payment history, reconciliation, receipt links, referrals, and recurring detail/update/cancel/portal hooks are API-backed.
+- One-time guest checkout stores only short-lived reconciliation identifiers before redirecting to hosted checkout.
 
 ### 7. Admin flows — complete
 
 - Admin tabs load/manage users, invitations, announcements, testimonies with image uploads, badges, prayer threads/comments, notifications, and audit logs.
 - Track edits PATCH API metric fields and update via Query invalidation.
 - Track creation/deletion were not added because the original admin UI exposed editing only.
-- The local field-update publisher and donation simulator were removed.
+- Administrator user detail now loads payment history and prayer-wall activity.
+- The local donation simulator remains removed; the updated field-update API has an access layer but its list UI remains blocked by an untyped item schema.
 
-### 8. API clarification blockers — explicitly excluded
+### 8. Remaining API contract blockers — explicitly identified
 
-The following remain blocked with no mock fallback: authenticated user subscription listing after reload; transaction/history/receipt data; leaderboard data; referral records and referral badge qualification; landing live counters; contact submission; the former Ministry Field Updates media/category shape; persistence for phone/referral source/communication opt-in; public unauthenticated tracks; and guest donations.
-
-Announcements and testimonies are displayed only through their documented API fields; they are not treated as a substitute contract for the removed Ministry Field Updates feed.
+The updated specification resolves nearly all earlier endpoint gaps. Remaining response-contract issues are maintained in `BACKEND_API_MISSING_FEATURES.md`: commitment list items and field-update page items are arbitrary objects; profile write-only fields are omitted from `User`; payment nested objects are weakly typed; invitation and track-commitment pagination is incomplete; and hosted-checkout return parameters are not guaranteed. No analytics requirements are included.
 
 ### 9. Mock removal — complete
 
 - Deleted `src/db.ts` and all imports/calls.
-- Removed seeded entities, simulated milestones, mock login/payment data, application localStorage writes, and full-page reloads.
-- localStorage remains only for theme, language, and the refresh token required for session restoration.
+- Removed seeded entities, simulated milestones, mock login/payment data, and full-page reloads.
+- localStorage remains for theme, language, the refresh token required for session restoration, and short-lived hosted-checkout reconciliation identifiers that are cleared after the result screen.
 
 ### 10. Acceptance verification
 
@@ -83,4 +83,4 @@ Announcements and testimonies are displayed only through their documented API fi
 
 ## Whole-plan conclusion
 
-All non-blocked checklist work is represented in the access layer, Query hooks, and UI. Every blocker is excluded or shown explicitly, and the final static audit found no hidden mock fallback. There are no unrecorded implementation deviations from the checklist.
+All contract-safe checklist work is represented in the access layer, Query hooks, and UI. Remaining schema deviations are excluded or shown explicitly, and the final static audit found no hidden mock fallback.
