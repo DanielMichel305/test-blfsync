@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowRight, CheckCircle2, ExternalLink, Heart, Loader2, XCircle } from 'lucide-react';
 import type { Badge, Donor, Track } from '../types';
@@ -7,7 +7,7 @@ import { getLocalizedTrackName, getLocalizedTrackUnitLabel } from '../utils/loca
 import { calculateSubscriptionImpact } from '../utils/impact';
 import { useCreateCheckout, useCreateGuestCheckout } from '../api/hooks';
 import { ApiError } from '../api/client';
-import { PENDING_CHECKOUT_KEY } from './RoutePages';
+import { PENDING_CHECKOUT_KEY } from '../paymentState';
 
 interface DonationModalProps {
   track: Track;
@@ -31,7 +31,6 @@ export default function DonationModal({ track, currentUser, initialAmount, initi
   const [status, setStatus] = useState<CheckoutState>('ready');
   const [error, setError] = useState('');
   const [paymentRequestId, setPaymentRequestId] = useState<string | null>(null);
-  const hasStartedCheckout = useRef(false);
 
   const minimum = frequency === 'one-time' ? 1 : frequency === 'annual' ? Math.ceil(track.min_monthly_gift * 12) : Math.ceil(track.min_monthly_gift);
   const impact = useMemo(() => calculateSubscriptionImpact(track, amount, frequency === 'annual' ? 'annual' : 'monthly'), [track, amount, frequency]);
@@ -82,13 +81,6 @@ export default function DonationModal({ track, currentUser, initialAmount, initi
     }
   };
 
-  useEffect(() => {
-    if (!currentUser) return;
-    if (hasStartedCheckout.current) return;
-    hasStartedCheckout.current = true;
-    void startCheckout();
-  }, [currentUser]);
-
   return (
     <AnimatePresence>
       <motion.div className="fixed inset-0 z-[100] bg-black/65 backdrop-blur-sm flex items-center justify-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
@@ -136,6 +128,11 @@ export default function DonationModal({ track, currentUser, initialAmount, initi
                 <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/15 p-4 flex items-center gap-3">
                   <Heart className="w-5 h-5 text-emerald-700" />
                   <p className="text-xs text-editorial-charcoal/70">~{Math.round(frequency === 'monthly' ? impact.monthlyUnits : impact.annualUnits).toLocaleString()} {getLocalizedTrackUnitLabel(track.track_id, track.target_unit_label, language)}</p>
+                </div>
+
+                <div className="rounded-2xl border border-editorial-charcoal/10 bg-editorial-charcoal/[0.03] p-4 text-xs text-editorial-charcoal/70">
+                  <p className="font-bold text-editorial-charcoal">{t('Review before checkout', 'راجع التفاصيل قبل الدفع')}</p>
+                  <p className="mt-1">{getLocalizedTrackName(track.track_id, track.name, language)} · ${amount.toLocaleString()} USD · {frequency === 'one-time' ? t('one-time gift', 'عطاء لمرة واحدة') : frequency === 'annual' ? t('annual gift', 'عطاء سنوي') : t('monthly gift', 'عطاء شهري')}</p>
                 </div>
 
                 {error && <div role="alert" className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-700 dark:text-rose-300">{error}</div>}

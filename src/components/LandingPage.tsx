@@ -17,12 +17,13 @@ import {
  ChevronRight, 
  Info, 
  X 
- , Flame, Crown, Heart, Layers, Share2, Globe, Youtube, Check
+ , Flame, Crown, Heart, Layers, Share2, Globe, Youtube, Check, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AnimateNumber } from './AnimateNumber';
 import { MethodologyModal } from './MethodologyModal';
 import { WorldMapHero } from './WorldMapHero';
+import { MinistryFieldUpdatesFeed } from './MinistryFieldUpdatesFeed';
 
 interface LandingPageProps {
  currentUser: Donor | null;
@@ -32,9 +33,11 @@ interface LandingPageProps {
  subscriptions: Subscription[];
  transactions: Transaction[];
  badges: Badge[];
- onUserChange?: (user: Donor | null) => void;
- updates?: any[];
- leaderboard?: any[];
+  onUserChange?: (user: Donor | null) => void;
+  updates?: any[];
+  leaderboard?: any[];
+  isCheckoutPending?: boolean;
+  checkoutError?: { message: string; tooltip: string } | null;
 }
 
 export default function LandingPage({
@@ -45,7 +48,9 @@ export default function LandingPage({
  subscriptions,
  transactions,
  badges,
- onUserChange
+ onUserChange,
+ isCheckoutPending = false,
+ checkoutError = null,
 }: LandingPageProps) {
  const { t, language } = useLanguage();
  // Selected tracks for the contract-based impact estimator.
@@ -84,11 +89,9 @@ export default function LandingPage({
   }, [tracks, quickTrackId]);
 
  // Smooth scroll & track highlight helper
- const handleStartSupporting = (trackId: string | null, minGift: number) => {
+ const handleStartSupporting = (trackId: string, amount: number) => {
  setSelectedTrackIds([trackId]);
- if (sliderVal < minGift) {
- setSliderVal(minGift);
- }
+ setSliderVal(amount);
  const element = document.getElementById('interactive-impact-sandbox');
  if (element) {
  element.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -407,6 +410,8 @@ export default function LandingPage({
           </section>
         )}
 
+        {currentUser && <MinistryFieldUpdatesFeed />}
+
         
         
         <section id="interactive-impact-sandbox" className="max-w-6xl mx-auto px-4 sm:px-6 mb-16 lg:mb-24">
@@ -584,18 +589,29 @@ export default function LandingPage({
                     </div>
                     
                     <div className="pt-6 mt-4 border-t border-white/10">
+                      {selectedTracksList.length > 1 && (
+                        <p className="mb-3 text-center text-[10px] leading-relaxed text-white/55">
+                          {t(`Your $${actualAmount.toLocaleString()} total is split evenly: $${Math.floor(actualAmount / selectedTracksList.length).toLocaleString()} per track.`, `يتم تقسيم إجمالي ${actualAmount.toLocaleString()}$ بالتساوي بين المسارات.`)}
+                        </p>
+                      )}
+                      {checkoutError && (
+                        <div className="group relative mb-3 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-center text-[10px] text-rose-100" role="alert" tabIndex={0} aria-describedby="checkout-error-tooltip">
+                          {checkoutError.message}
+                          <span id="checkout-error-tooltip" role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 -translate-x-1/2 rounded-lg bg-white px-3 py-2 text-left text-[10px] leading-relaxed text-editorial-charcoal opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus:opacity-100">{checkoutError.tooltip}</span>
+                        </div>
+                      )}
                       <button 
                         onClick={() => {
                           const checkoutTrack = selectedTracksList[0];
                           if (checkoutTrack) {
-                            onDonateClick(checkoutTrack, actualAmount, frequency);
+                            void onDonateClick(checkoutTrack, actualAmount, frequency);
                           }
                         }}
-                        disabled={selectedTracksList.length === 0}
+                        disabled={selectedTracksList.length === 0 || isCheckoutPending}
                         className="w-full py-4 bg-orange-600 dark:bg-orange-500 dark:bg-orange-600 hover:bg-orange-500 dark:bg-orange-600 dark:bg-orange-500 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-[0_4px_14px_0_rgba(234,88,12,0.39)] hover:shadow-[0_6px_20px_rgba(234,88,12,0.23)] hover:-translate-y-0.5 flex items-center justify-center gap-2"
                       >
-                        <Flame className="w-4 h-4" />
-                        <span>{t('Start Changing Lives', 'ابدأ بتغيير الحياة')}</span>
+                        {isCheckoutPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flame className="w-4 h-4" />}
+                        <span>{isCheckoutPending ? t('Preparing secure checkout…', 'جارٍ تجهيز الدفع الآمن…') : t('Start Changing Lives', 'ابدأ بتغيير الحياة')}</span>
                       </button>
                     </div>
                   </div>

@@ -1,18 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { Archive, ArrowLeft, ExternalLink, Plus, Save, Trash2, X } from 'lucide-react';
 import type { components } from '../../api/generated';
-import { type TrackListParams, useCreateTrack, useDeleteTrack, useMinistryTracks, useSubscription, useTrack, useTrackCommitments, useUpdateTrack } from '../../api/hooks';
+import { type TrackListParams, useCreateTrack, useCreateUnit, useDeleteTrack, useMinistryTracks, useSubscription, useTrack, useTrackCommitments, useUnits, useUpdateTrack } from '../../api/hooks';
+import type { CreateMinistryTrackInput } from '../../api/domains';
 import { AdminListControls, AdminListState, AdminPagination, FilterField, useAdminListState } from './AdminList';
 import { ConfirmDialog } from './ConfirmDialog';
 
 type Track = components['schemas']['MinistryTrack'];
-type TrackInput = components['schemas']['CreateMinistryTrackRequest'];
+type TrackInput = {
+  name: string; description?: string; cover_url?: string; current_metric_level: number; target_metric_level: number;
+  min_monthly_contribution: number; cost_per_unit: number; metricUnit: 'souls' | 'streams' | 'usd' | 'egp' | 'houses built';
+  target_period: 'Monthly' | 'Quarterly' | 'Annually'; isActive: boolean;
+};
+type CreateTrackInput = CreateMinistryTrackInput;
 type Period = TrackInput['target_period'];
 type Unit = TrackInput['metricUnit'];
 
-const emptyTrack: TrackInput = { name: '', description: '', current_metric_level: 0, target_metric_level: 1, min_monthly_contribution: 1, cost_per_unit: 1, metricUnit: 'souls', target_period: 'Annually', isActive: true };
+const emptyTrack: CreateTrackInput = { name: '', description: '', current_metric_level: 0, target_metric_level: 1, min_monthly_contribution: 1, cost_per_unit: 1, unitId: '', target_period: 'Annually', isActive: true };
 
-function validate(input: TrackInput) {
+function validate(input: Omit<TrackInput, 'metricUnit'> & { unitId?: string }) {
   if (!input.name.trim()) return 'Name is required.';
   if (input.description && input.description.length > 500) return 'Description must be 500 characters or fewer.';
   if (input.cover_url) { try { new URL(input.cover_url); } catch { return 'Cover URL must be a valid absolute URL.'; } }
@@ -20,7 +26,36 @@ function validate(input: TrackInput) {
   if (!Number.isInteger(input.target_metric_level) || input.target_metric_level <= 0) return 'Target metric must be a positive whole number.';
   if (!Number.isInteger(input.min_monthly_contribution) || input.min_monthly_contribution < 0) return 'Minimum contribution must be zero or a positive whole number.';
   if (!Number.isInteger(input.cost_per_unit) || input.cost_per_unit <= 0) return 'Cost per unit must be a positive whole number.';
+  if ('unitId' in input && !input.unitId) return 'Select a unit.';
   return '';
+}
+
+function CreateTrackForm({ initial, busy, isAdmin, onSubmit, onCancel }: { initial: CreateTrackInput; busy: boolean; isAdmin: boolean; onSubmit: (input: CreateTrackInput) => Promise<void>; onCancel: () => void }) {
+  const units = useUnits();
+  const createUnit = useCreateUnit();
+  const [form, setForm] = useState<CreateTrackInput>(initial);
+  const [newUnitName, setNewUnitName] = useState('');
+  const [error, setError] = useState('');
+  useEffect(() => setForm(initial), [initial]);
+  const field = <K extends keyof CreateTrackInput>(key: K, value: CreateTrackInput[K]) => setForm(current => ({ ...current, [key]: value }));
+  const addUnit = async () => {
+    const name = newUnitName.trim();
+    if (!name) { setError('Enter a unit name.'); return; }
+    setError('');
+    try { const unit = await createUnit.mutateAsync({ name }); field('unitId', unit.id); setNewUnitName(''); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Unit could not be created.'); }
+  };
+  return <form onSubmit={async event => { event.preventDefault(); const issue = validate(form); setError(issue); if (!issue) await onSubmit({ ...form, name: form.name.trim(), description: form.description?.trim() || undefined, cover_url: form.cover_url?.trim() || undefined }); }} className="grid gap-3 rounded-2xl border border-editorial-charcoal/10 bg-editorial-card p-5 md:grid-cols-2">
+    <label className="text-xs font-bold">Name<input required maxLength={100} value={form.name} onChange={e => field('name', e.target.value)} className="mt-1 w-full rounded-xl border bg-transparent p-2 font-normal" /></label>
+    <label className="text-xs font-bold">Cover URL<input type="url" value={form.cover_url || ''} onChange={e => field('cover_url', e.target.value)} className="mt-1 w-full rounded-xl border bg-transparent p-2 font-normal" /></label>
+    <label className="text-xs font-bold md:col-span-2">Description<textarea maxLength={500} value={form.description || ''} onChange={e => field('description', e.target.value)} rows={3} className="mt-1 w-full rounded-xl border bg-transparent p-2 font-normal" /></label>
+    {([['Current metric', 'current_metric_level', 0, '0.01'], ['Target metric', 'target_metric_level', 1, '1'], ['Minimum contribution', 'min_monthly_contribution', 0, '1'], ['Cost per unit', 'cost_per_unit', 1, '1']] as const).map(([label, key, min, step]) => <label key={key} className="text-xs font-bold">{label}<input required type="number" min={min} step={step} value={form[key]} onChange={e => field(key, Number(e.target.value))} className="mt-1 w-full rounded-xl border bg-transparent p-2 font-normal" /></label>)}
+    <div className="text-xs font-bold"><label>Metric unit<select required value={form.unitId} onChange={e => field('unitId', e.target.value)} disabled={units.isLoading || !!units.error} className="mt-1 w-full rounded-xl border bg-editorial-card p-2 font-normal disabled:opacity-50"><option value="">{units.isLoading ? 'Loading units…' : 'Select a unit'}</option>{units.data?.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></label>{units.error && <p role="alert" className="mt-1 font-normal text-rose-600">Units could not be loaded.</p>}{!units.isLoading && !units.error && !units.data?.length && <p className="mt-1 font-normal text-editorial-charcoal/50">No active units available.</p>}{isAdmin && <div className="mt-2 flex gap-2"><input aria-label="New unit name" maxLength={100} value={newUnitName} onChange={e => setNewUnitName(e.target.value)} placeholder="New unit name" className="min-w-0 flex-1 rounded-xl border bg-transparent p-2 font-normal" /><button type="button" disabled={createUnit.isPending} onClick={() => void addUnit()} className="rounded-full border px-3 text-[10px] disabled:opacity-50">{createUnit.isPending ? 'Adding…' : 'Add unit'}</button></div>}</div>
+    <label className="text-xs font-bold">Target period<select value={form.target_period} onChange={e => field('target_period', e.target.value as Period)} className="mt-1 w-full rounded-xl border bg-editorial-card p-2 font-normal">{(['Monthly', 'Quarterly', 'Annually'] as Period[]).map(value => <option key={value}>{value}</option>)}</select></label>
+    <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={form.isActive} onChange={e => field('isActive', e.target.checked)} /> Active</label>
+    {error && <p role="alert" className="text-xs text-rose-600 md:col-span-2">{error}</p>}
+    <div className="flex justify-end gap-2 md:col-span-2"><button type="button" onClick={onCancel} className="rounded-full border px-4 py-2 text-xs"><X className="mr-1 inline h-3 w-3" />Cancel</button><button disabled={busy || units.isLoading || !!units.error} className="rounded-full bg-editorial-charcoal px-4 py-2 text-xs font-bold text-editorial-cream disabled:opacity-40"><Save className="mr-1 inline h-3 w-3" />Create track</button></div>
+  </form>;
 }
 
 function TrackForm({ initial, submitLabel, busy, onSubmit, onCancel }: { initial: TrackInput; submitLabel: string; busy: boolean; onSubmit: (input: TrackInput) => Promise<void>; onCancel?: () => void }) {
@@ -41,12 +76,12 @@ function TrackForm({ initial, submitLabel, busy, onSubmit, onCancel }: { initial
   </form>;
 }
 
-export function AdminTracks({ selectedTrackId, onOpenTrack, onCloseTrack }: { selectedTrackId?: string; onOpenTrack: (id: string) => void; onCloseTrack: () => void }) {
+export function AdminTracks({ isAdmin, selectedTrackId, onOpenTrack, onCloseTrack }: { isAdmin: boolean; selectedTrackId?: string; onOpenTrack: (id: string) => void; onCloseTrack: () => void }) {
   if (selectedTrackId) return <AdminTrackDetail id={selectedTrackId} onBack={onCloseTrack} />;
-  return <AdminTrackList onOpenTrack={onOpenTrack} />;
+  return <AdminTrackList isAdmin={isAdmin} onOpenTrack={onOpenTrack} />;
 }
 
-function AdminTrackList({ onOpenTrack }: { onOpenTrack: (id: string) => void }) {
+function AdminTrackList({ isAdmin, onOpenTrack }: { isAdmin: boolean; onOpenTrack: (id: string) => void }) {
   const { query, update } = useAdminListState('tracks', { page: 1, limit: 20, search: '', isActive: '', sortBy: 'createdAt', sortOrder: 'ASC' });
   const params = { ...query, isActive: query.isActive === '' ? undefined : query.isActive === 'true' };
   const list = useMinistryTracks(params as TrackListParams);
@@ -55,7 +90,7 @@ function AdminTrackList({ onOpenTrack }: { onOpenTrack: (id: string) => void }) 
   const run = async (operation: () => Promise<unknown>) => { setError(''); try { await operation(); setCreating(false); setEditing(null); setConfirm(null); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Track action failed.'); } };
   return <div className="space-y-4">
     <div className="flex items-center justify-between"><div><h2 className="text-2xl font-serif">Ministry tracks</h2><p className="text-xs text-editorial-charcoal/50">Manage impact metrics, giving constraints, and reporting periods.</p></div><button onClick={() => setCreating(value => !value)} className="rounded-full bg-editorial-charcoal px-4 py-2 text-xs font-bold text-editorial-cream"><Plus className="mr-1 inline h-4 w-4" />Create ministry track</button></div>
-    {creating && <TrackForm initial={emptyTrack} submitLabel="Create track" busy={create.isPending} onCancel={() => setCreating(false)} onSubmit={input => run(() => create.mutateAsync(input))} />}
+    {creating && <CreateTrackForm initial={emptyTrack} busy={create.isPending} isAdmin={isAdmin} onCancel={() => setCreating(false)} onSubmit={input => run(() => create.mutateAsync(input))} />}
     <AdminListControls query={query} onChange={update}><FilterField label="Active state"><select value={query.isActive} onChange={e => update({ isActive: e.target.value })}><option value="">All</option><option value="true">Active</option><option value="false">Inactive</option></select></FilterField><FilterField label="Sort by"><select value={query.sortBy} onChange={e => update({ sortBy: e.target.value })}>{['createdAt', 'isActive', 'Alphabetical', 'current_metric_level', 'target_metric_level', 'min_monthly_contribution'].map(value => <option key={value}>{value}</option>)}</select></FilterField><FilterField label="Order"><select value={query.sortOrder} onChange={e => update({ sortOrder: e.target.value })}><option>ASC</option><option>DESC</option></select></FilterField></AdminListControls>
     {error && <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-xs text-rose-600">{error}</p>}
     <AdminListState loading={list.isLoading} error={list.error} empty={!list.data?.ministryTracks.length}><div className="space-y-3">{list.data?.ministryTracks.map(track => editing?.id === track.id ? <TrackForm key={track.id} initial={{ name: track.name, description: track.description, cover_url: track.cover_url || undefined, current_metric_level: track.current_metric_level, target_metric_level: track.target_metric_level, min_monthly_contribution: track.min_monthly_contribution, cost_per_unit: track.cost_per_unit, metricUnit: track.metricUnit, target_period: track.target_period, isActive: track.isActive }} submitLabel="Save changes" busy={save.isPending} onCancel={() => setEditing(null)} onSubmit={input => run(() => save.mutateAsync({ id: track.id, input }))} /> : <article key={track.id} role="link" tabIndex={0} onClick={() => onOpenTrack(track.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') onOpenTrack(track.id); }} className="cursor-pointer rounded-2xl border border-editorial-charcoal/10 bg-editorial-card p-5 transition hover:border-editorial-charcoal/25 hover:shadow-sm"><div className="flex flex-wrap items-start gap-3"><div className="min-w-0 flex-1"><h3 className="font-serif text-lg">{track.name}</h3><p className="text-xs text-editorial-charcoal/55">{track.current_metric_level.toLocaleString()} / {track.target_metric_level.toLocaleString()} {track.metricUnit} · {track.target_period} · {track.isActive ? 'Active' : 'Inactive'}</p><p className="mt-2 text-sm text-editorial-charcoal/65">{track.description}</p><p className="mt-2 text-[10px] text-editorial-charcoal/45">Minimum ${track.min_monthly_contribution} · ${track.cost_per_unit} per unit</p></div><button onClick={event => { event.stopPropagation(); setEditing(track); }} className="rounded-full border px-3 py-1.5 text-xs">Edit</button>{track.isActive && <button title="Deactivate" onClick={event => { event.stopPropagation(); setConfirm({ track, action: 'deactivate' }); }} className="p-2 text-amber-700"><Archive className="h-4 w-4" /></button>}<button title="Delete" onClick={event => { event.stopPropagation(); setConfirm({ track, action: 'delete' }); }} className="p-2 text-rose-600"><Trash2 className="h-4 w-4" /></button><ExternalLink className="h-4 w-4 text-editorial-charcoal/35" /></div></article>)}</div></AdminListState>

@@ -14,6 +14,7 @@ import {
 import { useLanguage } from "../LanguageContext";
 import { useLogout, useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '../api/hooks';
 import { notificationToDisplay } from '../api/adapters';
+import { canAccessReferrals } from '../utils/access';
 
 interface HeaderProps {
   currentUser: Donor | null;
@@ -28,6 +29,7 @@ interface HeaderProps {
   ) => void;
   theme: "light" | "dark";
   onToggleTheme: () => void;
+  onNavigate?: (path: string) => void;
 }
 
 export default function Header({
@@ -40,6 +42,7 @@ export default function Header({
   setDashboardSubTab,
   theme,
   onToggleTheme,
+  onNavigate,
 }: HeaderProps) {
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -49,6 +52,13 @@ export default function Header({
   const markAllRead = useMarkAllNotificationsRead();
   const logout = useLogout();
   const notifications = (notificationFeed.data?.notifications || []).map(notification => notificationToDisplay(notification, currentUser?.donor_id || ''));
+  const openDashboard = (tab: HeaderProps['dashboardSubTab']) => {
+    const paths: Record<HeaderProps['dashboardSubTab'], string> = { overview: '/', dashboard: '/dashboard', prayer: '/prayer', profile: '/profile', referrals: '/referrals' };
+    if (onNavigate) onNavigate(paths[tab]);
+    else { setActiveTab('dashboard'); setDashboardSubTab(tab); }
+  };
+  const openLanding = () => onNavigate ? onNavigate('/') : setActiveTab('landing');
+  const openAdmin = () => onNavigate ? onNavigate('/admin') : setActiveTab('admin');
 
   const getUserTierName = () => {
     if (!currentUser) return "";
@@ -65,7 +75,7 @@ export default function Header({
       await logout.mutateAsync();
     } finally {
       onUserChange(null);
-      setActiveTab("landing");
+      openLanding();
     }
   };
 
@@ -81,10 +91,9 @@ export default function Header({
           className="flex items-center gap-3.5 cursor-pointer animate-fade-in shrink-0"
           onClick={() => {
             if (currentUser) {
-              setActiveTab("dashboard");
-              setDashboardSubTab("overview");
+              openDashboard("overview");
             } else {
-              setActiveTab("landing");
+              openLanding();
             }
           }}
         >
@@ -107,7 +116,7 @@ export default function Header({
             <>
               <button
                 onClick={() => {
-                  setActiveTab("landing");
+                  openLanding();
                 }}
                 className={`text-[10px] uppercase tracking-wider font-bold px-4 py-2.5 md:px-3.5 md:py-1.5 rounded-full transition-all duration-250 cursor-pointer ${
                   activeTab === "landing" || (activeTab === "dashboard" && dashboardSubTab === "overview")
@@ -119,8 +128,7 @@ export default function Header({
               </button>
               <button
                 onClick={() => {
-                  setActiveTab("dashboard");
-                  setDashboardSubTab("dashboard");
+                  openDashboard("dashboard");
                 }}
                 className={`text-[10px] uppercase tracking-wider font-bold px-4 py-2.5 md:px-3.5 md:py-1.5 rounded-full transition-all duration-250 cursor-pointer ${
                   activeTab === "dashboard" && dashboardSubTab === "dashboard"
@@ -132,8 +140,7 @@ export default function Header({
               </button>
               <button
                 onClick={() => {
-                  setActiveTab("dashboard");
-                  setDashboardSubTab("prayer");
+                  openDashboard("prayer");
                 }}
                 className={`text-[10px] uppercase tracking-wider font-bold px-4 py-2.5 md:px-3.5 md:py-1.5 rounded-full transition-all duration-250 cursor-pointer ${
                   activeTab === "dashboard" && dashboardSubTab === "prayer"
@@ -144,10 +151,9 @@ export default function Header({
                 {t("Prayer Wall", "حائط الصلاة")}
               </button>
               
-              <button
+              {canAccessReferrals(currentUser) && <button
                 onClick={() => {
-                  setActiveTab("dashboard");
-                  setDashboardSubTab("referrals");
+                  openDashboard("referrals");
                 }}
                 className={`text-[10px] uppercase tracking-wider font-bold px-4 py-2.5 md:px-3.5 md:py-1.5 rounded-full transition-all duration-250 cursor-pointer ${
                   activeTab === "dashboard" && dashboardSubTab === "referrals"
@@ -156,13 +162,13 @@ export default function Header({
                 }`}
               >
                 {t("Refer Friends", "دعوة الأصدقاء")}
-              </button>
+              </button>}
             </>
           )}
 
           {currentUser?.role === "admin" && (
             <button
-              onClick={() => setActiveTab("admin")}
+              onClick={openAdmin}
               className={`text-[10px] uppercase tracking-wider font-bold px-4 py-2 rounded-full transition-all duration-250 cursor-pointer ${
                 activeTab === "admin"
                   ? "bg-editorial-charcoal text-editorial-cream shadow-xs"
@@ -178,7 +184,9 @@ export default function Header({
         <div id="header-actions" className="flex items-center gap-2.5">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className={`md:hidden w-11 h-11 flex items-center justify-center border border-editorial-charcoal/10 text-editorial-charcoal bg-transparent hover:bg-editorial-charcoal/5 hover:border-editorial-charcoal/30 transition-all cursor-pointer rounded-full shrink-0 ${currentUser ? 'hidden' : ''}`}
+            className="md:hidden w-11 h-11 flex items-center justify-center border border-editorial-charcoal/10 text-editorial-charcoal bg-transparent hover:bg-editorial-charcoal/5 hover:border-editorial-charcoal/30 transition-all cursor-pointer rounded-full shrink-0"
+            aria-label={isMobileMenuOpen ? t('Close navigation menu', 'إغلاق قائمة التنقل') : t('Open navigation menu', 'فتح قائمة التنقل')}
+            aria-expanded={isMobileMenuOpen}
           >
             {isMobileMenuOpen ? (
               <X className="w-4 h-4" />
@@ -302,8 +310,7 @@ export default function Header({
               <div className="absolute top-full right-0 mt-2 w-48 bg-editorial-cream border border-editorial-charcoal/10 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 flex flex-col py-2">
                 <button
                   onClick={() => {
-                    setActiveTab("dashboard");
-                    setDashboardSubTab("profile");
+                    openDashboard("profile");
                   }}
                   className="w-full text-left px-4 py-2 text-sm text-editorial-charcoal hover:bg-editorial-charcoal/5 transition-colors flex items-center gap-2"
                 >
@@ -339,7 +346,7 @@ export default function Header({
               <>
                 <button
                   onClick={() => {
-                    setActiveTab("landing");
+                    openLanding();
                     setIsMobileMenuOpen(false);
                   }}
                   className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
@@ -348,8 +355,7 @@ export default function Header({
                 </button>
                 <button
                   onClick={() => {
-                    setActiveTab("dashboard");
-                    setDashboardSubTab("dashboard");
+                    openDashboard("dashboard");
                     setIsMobileMenuOpen(false);
                   }}
                   className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
@@ -358,8 +364,7 @@ export default function Header({
                 </button>
                 <button
                   onClick={() => {
-                    setActiveTab("dashboard");
-                    setDashboardSubTab("prayer");
+                    openDashboard("prayer");
                     setIsMobileMenuOpen(false);
                   }}
                   className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
@@ -368,30 +373,28 @@ export default function Header({
                 </button>
                 <button
                   onClick={() => {
-                    setActiveTab("dashboard");
-                    setDashboardSubTab("profile");
+                    openDashboard("profile");
                     setIsMobileMenuOpen(false);
                   }}
                   className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
                 >
                   {t("Profile & Contact", "الملف الشخصي")}
                 </button>
-                <button
+                {canAccessReferrals(currentUser) && <button
                   onClick={() => {
-                    setActiveTab("dashboard");
-                    setDashboardSubTab("referrals");
+                    openDashboard("referrals");
                     setIsMobileMenuOpen(false);
                   }}
                   className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
                 >
                   {t("Refer Friends", "دعوة الأصدقاء")}
-                </button>
+                </button>}
               </>
             )}
             {currentUser?.role === "admin" && (
               <button
                 onClick={() => {
-                  setActiveTab("admin");
+                  openAdmin();
                   setIsMobileMenuOpen(false);
                 }}
                 className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
