@@ -1,12 +1,17 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import {
-  announcementsApi, authApi, badgesApi, guestCheckoutsApi, invitationsApi, logsApi, ministryTracksApi,
-  fieldUpdatesApi, notificationsApi, paymentsApi, prayerWallApi, publicApi, referralsApi, subscriptionsApi, testimoniesApi, usersApi,
+  announcementsApi, authApi, badgesApi, checkoutSessionsApi, guestCheckoutsApi, invitationsApi, logsApi, ministryTracksApi,
+  fieldUpdatesApi, notificationsApi, paymentsApi, prayerWallApi, publicApi, referralsApi, subscriptionsApi, testimoniesApi, unitsApi, usersApi,
 } from './domains';
 import { queryKeys } from './queryKeys';
+import type { components, paths } from './generated';
 
 type ListParams = Record<string, string | number | boolean | undefined>;
 type PageParams = { page?: number; limit?: number };
+type SubscriptionStatus = components['schemas']['SubscriptionStatus'];
+type CommitmentPage = components['schemas']['CommitmentPage'];
 export type TrackListParams = PageParams & { search?: string; isActive?: boolean; sortBy?: 'createdAt' | 'isActive' | 'Alphabetical' | 'current_metric_level' | 'target_metric_level' | 'min_monthly_contribution'; sortOrder?: 'ASC' | 'DESC' };
 export type UserListParams = PageParams & { search?: string; role?: 'admin' | 'family' | 'friend'; isActive?: boolean; sortBy?: 'createdAt' | 'firstName' | 'lastName' | 'email' | 'role' | 'isActive' | 'lastLoginAt'; sortOrder?: 'ASC' | 'DESC' };
 export type InvitationListParams = PageParams & { search?: string; status?: 'pending' | 'accepted' | 'expired' | 'revoked'; role?: 'admin' | 'family' | 'friend'; deliveryStatus?: 'pending' | 'sent' | 'failed'; sortBy?: 'createdAt' | 'updatedAt' | 'email' | 'status' | 'expiresAt'; sortOrder?: 'ASC' | 'DESC' };
@@ -16,6 +21,8 @@ export type BadgeListParams = PageParams & { search?: string; isActive?: boolean
 export type ModerationListParams = PageParams & { search?: string; status?: 'visible' | 'removed'; type?: 'prayer' | 'praise'; threadId?: string };
 export type ManagedNotificationListParams = PageParams & { search?: string; origin?: 'admin' | 'system'; audienceType?: 'all' | 'users' | 'roles' | 'tracks' };
 export type AuditLogListParams = PageParams & { userId?: string; entityName?: string; entityId?: string; action?: string; startDate?: string; endDate?: string; sortBy?: 'createdAt' | 'action' | 'entityName'; sortOrder?: 'ASC' | 'DESC' };
+export type FieldUpdateAdminListParams = NonNullable<paths['/field-updates']['get']['parameters']['query']>;
+export type FieldUpdateListParams = Pick<FieldUpdateAdminListParams, 'page' | 'limit'>;
 
 export function useSessionRestore() {
   return useQuery({ queryKey: queryKeys.auth.session, queryFn: () => authApi.restoreSession(), retry: false, staleTime: Infinity });
@@ -70,10 +77,39 @@ export function useAcceptInvitation() {
 export function useMinistryTracks(params: TrackListParams = {}, enabled = true) {
   return useQuery({ queryKey: queryKeys.tracks.list(params), queryFn: () => ministryTracksApi.list(params), enabled, placeholderData: previous => previous });
 }
+export const useUnits = (enabled = true) => useQuery({ queryKey: queryKeys.units.list, queryFn: unitsApi.list, enabled });
+export function useCreateUnit() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: unitsApi.create, onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.units.all }) });
+}
+export function useDeleteUnit() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: unitsApi.delete, onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.units.all }) });
+}
 export const usePublicTracks = (params: PageParams = {}, enabled = true) => useQuery({ queryKey: queryKeys.public.tracks(params), queryFn: () => publicApi.tracks(params), enabled, placeholderData: previous => previous });
 export const usePublicAnnouncements = (params: PageParams = {}, enabled = true) => useQuery({ queryKey: queryKeys.public.announcements(params), queryFn: () => publicApi.announcements(params), enabled });
 export const usePublicTestimonies = (params: PageParams = {}, enabled = true) => useQuery({ queryKey: queryKeys.public.testimonies(params), queryFn: () => publicApi.testimonies(params), enabled });
-export const usePublicFieldUpdates = (params: ListParams = {}, enabled = true) => useQuery({ queryKey: queryKeys.public.fieldUpdates(params), queryFn: () => fieldUpdatesApi.list(params), enabled });
+export const useFieldUpdates = (params: FieldUpdateListParams = {}, enabled = true) => useQuery({ queryKey: queryKeys.fieldUpdates.userList(params), queryFn: () => fieldUpdatesApi.list({ ...params, status: 'published' }), enabled, placeholderData: previous => previous });
+export const useAdminFieldUpdates = (params: FieldUpdateAdminListParams = {}, enabled = true) => useQuery({ queryKey: queryKeys.fieldUpdates.adminList(params), queryFn: () => fieldUpdatesApi.list(params), enabled, placeholderData: previous => previous });
+export const useFieldUpdate = (id: string, enabled = true) => useQuery({ queryKey: queryKeys.fieldUpdates.detail(id), queryFn: () => fieldUpdatesApi.get(id), enabled: enabled && !!id });
+
+function useFieldUpdateMutation<TVariables>(mutationFn: (variables: TVariables) => ReturnType<typeof fieldUpdatesApi.create>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: fieldUpdate => {
+      client.setQueryData(queryKeys.fieldUpdates.detail(fieldUpdate.id), fieldUpdate);
+      void client.invalidateQueries({ queryKey: queryKeys.fieldUpdates.lists() });
+      void client.invalidateQueries({ queryKey: queryKeys.fieldUpdates.detail(fieldUpdate.id) });
+    },
+  });
+}
+
+export const useCreateFieldUpdate = () => useFieldUpdateMutation(fieldUpdatesApi.create);
+export const useUpdateFieldUpdate = () => useFieldUpdateMutation(({ id, input }: { id: string; input: Parameters<typeof fieldUpdatesApi.update>[1] }) => fieldUpdatesApi.update(id, input));
+export const usePublishFieldUpdate = () => useFieldUpdateMutation(({ id, publishedAt }: { id: string; publishedAt?: string }) => fieldUpdatesApi.publish(id, publishedAt));
+export const useArchiveFieldUpdate = () => useFieldUpdateMutation(fieldUpdatesApi.archive);
+export const useRestoreFieldUpdate = () => useFieldUpdateMutation(fieldUpdatesApi.restore);
 
 export function useTrack(id: string, enabled = true) {
   return useQuery({ queryKey: queryKeys.tracks.detail(id), queryFn: () => ministryTracksApi.get(id), enabled: enabled && !!id });
@@ -110,24 +146,82 @@ export function useSubscriptions(params: ListParams = {}, enabled = true) {
 }
 
 export function useCreateCheckout() {
-  return useMutation({ mutationFn: subscriptionsApi.createCheckout });
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: subscriptionsApi.createCheckout,
+    // A checkout creates (or retrieves idempotently) the payment request that
+    // feeds Giving history. Clear every page so returning to the dashboard
+    // cannot show a pre-checkout snapshot.
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.payments.all }),
+  });
 }
 export const useCreateGuestCheckout = () => useMutation({ mutationFn: guestCheckoutsApi.create });
 export const useGuestPayment = (id: string, token: string, enabled = true) => useQuery({ queryKey: queryKeys.payments.detail(`guest:${id}`), queryFn: () => guestCheckoutsApi.payment(id, token), enabled: enabled && !!id && !!token, refetchInterval: query => query.state.data?.status === 'pending' ? 4000 : false });
-export const usePayments = (params: ListParams = {}, enabled = true) => useQuery({ queryKey: queryKeys.payments.list(params), queryFn: () => paymentsApi.list(params), enabled, placeholderData: previous => previous });
-export const usePayment = (id: string, enabled = true) => useQuery({ queryKey: queryKeys.payments.detail(id), queryFn: () => paymentsApi.get(id), enabled: enabled && !!id, refetchInterval: query => query.state.data?.status === 'pending' ? 4000 : false });
+export const usePayments = (params: ListParams = {}, enabled = true) => useQuery({
+  queryKey: queryKeys.payments.list(params),
+  queryFn: () => paymentsApi.list(params),
+  enabled,
+  // Payment status is webhook-authoritative, so never treat the shared
+  // 30-second query cache as the source of truth for Giving history.
+  staleTime: 0,
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: true,
+  refetchInterval: query => query.state.data?.payments.some(payment => payment.status === 'pending') ? 4000 : false,
+});
+export function usePayment(id: string, enabled = true) {
+  const client = useQueryClient();
+  const query = useQuery({
+    queryKey: queryKeys.payments.detail(id),
+    queryFn: () => paymentsApi.get(id),
+    enabled: enabled && !!id,
+    refetchInterval: query => query.state.data?.status === 'pending' ? 4000 : false,
+  });
+  useEffect(() => {
+    if (query.data && query.data.status !== 'pending') void client.invalidateQueries({ queryKey: queryKeys.payments.all });
+  }, [client, query.data]);
+  return query;
+}
+
+export function updateSubscriptionInLists(client: QueryClient, subscription: SubscriptionStatus) {
+  client.setQueriesData<CommitmentPage>({ queryKey: queryKeys.subscriptions.all }, current => current ? {
+    ...current,
+    commitments: current.commitments.map(commitment => commitment.subscription?.id === subscription.id
+      ? { ...commitment, subscription }
+      : commitment),
+  } : current);
+}
+
+export async function invalidateSubscriptionQueries(client: QueryClient, id: string) {
+  await Promise.all([
+    client.invalidateQueries({ queryKey: queryKeys.subscriptions.all }),
+    client.invalidateQueries({ queryKey: queryKeys.subscriptions.detail(id) }),
+  ]);
+}
 
 export function useUpdateSubscription() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: Parameters<typeof subscriptionsApi.update>[1] }) => subscriptionsApi.update(id, input),
-    onSuccess: (_, variables) => client.invalidateQueries({ queryKey: queryKeys.subscriptions.detail(variables.id) }),
+    onSuccess: async (result, variables) => {
+      if ('subscription' in result) {
+        client.setQueryData(queryKeys.subscriptions.detail(variables.id), result.subscription);
+        updateSubscriptionInLists(client, result.subscription);
+      }
+      await invalidateSubscriptionQueries(client, variables.id);
+    },
   });
 }
 
 export function useCancelSubscription() {
   const client = useQueryClient();
-  return useMutation({ mutationFn: subscriptionsApi.cancel, onSuccess: (_, id) => client.invalidateQueries({ queryKey: queryKeys.subscriptions.detail(id) }) });
+  return useMutation({
+    mutationFn: subscriptionsApi.cancel,
+    onSuccess: async (result, id) => {
+      client.setQueryData(queryKeys.subscriptions.detail(id), result.subscription);
+      updateSubscriptionInLists(client, result.subscription);
+      await invalidateSubscriptionQueries(client, id);
+    },
+  });
 }
 
 export const useBillingPortal = () => useMutation({ mutationFn: subscriptionsApi.billingPortal });
@@ -202,6 +296,10 @@ export function useUsers(params: UserListParams = {}, enabled = true) {
 export const useUser = (id: string, enabled = true) => useQuery({ queryKey: queryKeys.admin.user(id), queryFn: () => usersApi.get(id), enabled: enabled && !!id });
 export const useUserCommitments = (id: string, params: ListParams = {}, enabled = true) => useQuery({ queryKey: queryKeys.admin.userCommitments(id, params), queryFn: () => usersApi.commitments(id, params), enabled: enabled && !!id, placeholderData: previous => previous });
 export const useUserPayments = (id: string, params: ListParams = {}, enabled = true) => useQuery({ queryKey: queryKeys.admin.userPayments(id, params), queryFn: () => usersApi.payments(id, params), enabled: enabled && !!id, placeholderData: previous => previous });
+export const useUserCheckoutSessions = (id: string, params: ListParams = {}, enabled = true) => useQuery({ queryKey: queryKeys.checkoutSessions.user(id, params), queryFn: () => checkoutSessionsApi.forUser(id, params), enabled: enabled && !!id, placeholderData: previous => previous });
+function useCheckoutSessionMutation(fn: (id: string) => Promise<unknown>) { const client = useQueryClient(); return useMutation({ mutationFn: fn, onSuccess: async () => { await client.invalidateQueries({ queryKey: queryKeys.checkoutSessions.all }); } }); }
+export const useDeleteCheckoutSession = () => useCheckoutSessionMutation(checkoutSessionsApi.delete);
+export const useExpireCheckoutSession = () => useCheckoutSessionMutation(checkoutSessionsApi.expire);
 export const useUserPrayerActivity = (id: string, params: ListParams = {}, enabled = true) => useQuery({ queryKey: queryKeys.admin.userPrayerActivity(id, params), queryFn: () => usersApi.prayerActivity(id, params), enabled: enabled && !!id, placeholderData: previous => previous });
 
 function useAdminUsersMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<unknown>) {

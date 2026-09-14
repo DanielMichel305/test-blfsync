@@ -2099,6 +2099,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active units
+         * @description Available to every authenticated role. Soft-deleted units are excluded.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Active units. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MinistryUnit"][];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+            };
+        };
+        put?: never;
+        /**
+         * Create a unit
+         * @description Admin-only.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateMinistryUnitRequest"];
+                };
+            };
+            responses: {
+                /** @description Unit created. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MinistryUnit"];
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/units/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Soft-delete a unit
+         * @description Admin-only. Referenced units cannot be deleted.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Unit deleted. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ministry-tracks": {
         parameters: {
             query?: never;
@@ -3683,7 +3800,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List published field updates, or lifecycle records for an administrator */
+        /**
+         * List visible field updates
+         * @description Authenticated users see only published records whose publication timestamp has arrived. Administrators may list draft, published, or archived records and use all filters.
+         */
         get: {
             parameters: {
                 query?: {
@@ -3694,6 +3814,8 @@ export interface paths {
                     trackId?: string;
                     category?: string;
                     tag?: string;
+                    sortBy?: "createdAt" | "updatedAt" | "publishedAt" | "title" | "tag" | "category" | "status";
+                    sortOrder?: "ASC" | "DESC";
                 };
                 header?: never;
                 path?: never;
@@ -3710,12 +3832,15 @@ export interface paths {
                         "application/json": components["schemas"]["FieldUpdatePage"];
                     };
                 };
+                400: components["responses"]["ValidationError"];
+                401: components["responses"]["Unauthorized"];
+                500: components["responses"]["ServerError"];
             };
         };
         put?: never;
         /**
          * Create a field update
-         * @description Admin-only multipart request; media is optional.
+         * @description Admin-only. Creates a draft by default. A single image or video may be supplied as multipart media, or an existing HTTPS URL from the matching configured CDN may be supplied with mediaType. Uploads and URL metadata cannot be combined.
          */
         post: {
             parameters: {
@@ -3726,7 +3851,8 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "multipart/form-data": components["schemas"]["CreateFieldUpdateRequest"];
+                    "application/json": components["schemas"]["CreateFieldUpdateRequest"];
+                    "multipart/form-data": components["schemas"]["CreateFieldUpdateMultipartRequest"];
                 };
             };
             responses: {
@@ -3744,6 +3870,8 @@ export interface paths {
                 400: components["responses"]["ValidationError"];
                 401: components["responses"]["Unauthorized"];
                 403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                500: components["responses"]["ServerError"];
             };
         };
         delete?: never;
@@ -3759,7 +3887,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a visible field update or an admin lifecycle record */
+        /**
+         * Get a visible field update
+         * @description Authenticated non-admin users receive only currently visible published records. Administrators may retrieve records in any lifecycle state and receive archivedAt metadata.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -3777,17 +3908,22 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["FieldUpdate"];
+                        "application/json": {
+                            fieldUpdate: components["schemas"]["FieldUpdate"];
+                        };
                     };
                 };
+                400: components["responses"]["ValidationError"];
+                401: components["responses"]["Unauthorized"];
                 404: components["responses"]["NotFound"];
+                500: components["responses"]["ServerError"];
             };
         };
         put?: never;
         post?: never;
         /**
-         * Idempotently archive a field update
-         * @description Admin-only.
+         * Archive a field update
+         * @description Admin-only. Sets status and archivedAt. Repeating the operation for an already archived record returns a conflict.
          */
         delete: {
             parameters: {
@@ -3811,16 +3947,19 @@ export interface paths {
                         };
                     };
                 };
+                400: components["responses"]["ValidationError"];
                 401: components["responses"]["Unauthorized"];
                 403: components["responses"]["Forbidden"];
                 404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                500: components["responses"]["ServerError"];
             };
         };
         options?: never;
         head?: never;
         /**
          * Update, publish, archive, or restore a field update
-         * @description Admin-only.
+         * @description Admin-only. Draft records may remain draft, publish, or archive. Published records may remain published or archive. Archived records are immutable and may only be restored with a status-only change to published. A status-only no-op is a conflict. publishedAt is server-populated when publishing unless a valid timestamp is supplied.
          */
         patch: {
             parameters: {
@@ -3833,7 +3972,8 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "multipart/form-data": components["schemas"]["UpdateFieldUpdateRequest"];
+                    "application/json": components["schemas"]["UpdateFieldUpdateRequest"];
+                    "multipart/form-data": components["schemas"]["UpdateFieldUpdateMultipartRequest"];
                 };
             };
             responses: {
@@ -3852,6 +3992,8 @@ export interface paths {
                 401: components["responses"]["Unauthorized"];
                 403: components["responses"]["Forbidden"];
                 404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                500: components["responses"]["ServerError"];
             };
         };
         trace?: never;
@@ -4452,6 +4594,14 @@ export interface components {
             message: string;
             logs: components["schemas"]["AuditLog"][];
         };
+        MinistryUnit: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        CreateMinistryUnitRequest: {
+            name: string;
+        };
         MinistryTrack: {
             /** Format: uuid */
             id: string;
@@ -4484,8 +4634,8 @@ export interface components {
             target_metric_level: number;
             min_monthly_contribution: number;
             cost_per_unit: number;
-            /** @enum {string} */
-            metricUnit: "souls" | "streams" | "usd" | "egp" | "houses built";
+            /** Format: uuid */
+            unitId: string;
             /** @enum {string} */
             target_period: "Monthly" | "Quarterly" | "Annually";
             /** @default true */
@@ -4824,10 +4974,40 @@ export interface components {
             /** Format: binary */
             profilePictureUrl?: string;
         };
+        SubscriptionCommitment: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            type: "one-time" | "recurring";
+            amount: number;
+            amountMinor: number;
+            currency: string;
+            /** @enum {string|null} */
+            interval: "month" | "year" | null;
+            /** @enum {string} */
+            status: "pending" | "active" | "completed" | "failed" | "cancelled";
+            paymentStatus: string;
+            ministryTrack: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                description: string;
+                /** Format: uri */
+                coverUrl: string | null;
+                isActive: boolean;
+            } | null;
+            subscription: components["schemas"]["SubscriptionStatus"] | null;
+            /** Format: date-time */
+            completedAt: string | null;
+            /** Format: date-time */
+            cancelledAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
         CommitmentPage: components["schemas"]["Pagination"] & {
-            commitments: {
-                [key: string]: unknown;
-            }[];
+            commitments: components["schemas"]["SubscriptionCommitment"][];
         };
         Payment: {
             /** Format: uuid */
@@ -4835,7 +5015,7 @@ export interface components {
             /** Format: uuid */
             paymentRequestId: string;
             /** @enum {string} */
-            status: "pending" | "completed" | "failed" | "expired" | "refunded" | "partially_refunded";
+            status: "pending" | "confirmed" | "completed" | "failed" | "expired" | "refunded" | "partially_refunded";
             /** @enum {string} */
             type: "one-time" | "recurring";
             /** @enum {string|null} */
@@ -4843,6 +5023,8 @@ export interface components {
             amount: number;
             amountMinor: number;
             currency: string;
+            /** Format: date-time */
+            occurredAt?: string;
             commitment?: {
                 [key: string]: unknown;
             } | null;
@@ -4948,23 +5130,30 @@ export interface components {
             };
             verificationToken: string;
         };
+        /** @description Safe field-update representation. archivedAt is included only for administrators; storage keys and provider details are never returned. */
         FieldUpdate: {
             /** Format: uuid */
             id: string;
             title: string;
             tag: string;
-            category?: string | null;
+            category: string | null;
             mdBody: string;
             /** @enum {string} */
             status: "draft" | "published" | "archived";
             /** Format: date-time */
-            publishedAt?: string | null;
-            /** Format: date-time */
-            archivedAt?: string | null;
+            publishedAt: string | null;
+            /**
+             * Format: date-time
+             * @description Present only in administrator responses.
+             */
+            readonly archivedAt?: string | null;
             /** @enum {string|null} */
-            mediaType: "image" | "video" | "audio" | "document" | null;
-            /** Format: uri */
-            mediaUrl?: string | null;
+            mediaType: "image" | "video" | null;
+            /**
+             * Format: uri
+             * @description Configured image or video CDN URL; never a stored object key.
+             */
+            readonly mediaUrl: string | null;
             ministryTrack: {
                 /** Format: uuid */
                 id: string;
@@ -4981,24 +5170,64 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        /** @description JSON create body. mediaUrl and mediaType must either both be omitted, both be non-null, or both be null. publishedAt is accepted only with published status. */
         CreateFieldUpdateRequest: {
             title: string;
             tag: string;
             mdBody: string;
-            /** @enum {string} */
-            status?: "draft" | "published" | "archived";
-            /** Format: date-time */
+            /**
+             * @default draft
+             * @enum {string}
+             */
+            status: "draft" | "published" | "archived";
+            /**
+             * Format: date-time
+             * @description Valid only when status is published; defaults to the server time when publishing.
+             */
             publishedAt?: string | null;
             /** Format: uuid */
             ministryTrackId?: string | null;
             category?: string | null;
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @description Must belong to the configured pull-zone origin matching mediaType.
+             */
             mediaUrl?: string | null;
             /** @enum {string|null} */
-            mediaType?: "image" | "video" | "audio" | "document" | null;
-            /** Format: binary */
+            mediaType?: "image" | "video" | null;
+        };
+        /** @description Multipart create body. Supply either media or the mediaUrl/mediaType pair, never both. */
+        CreateFieldUpdateMultipartRequest: {
+            title: string;
+            tag: string;
+            mdBody: string;
+            /**
+             * @default draft
+             * @enum {string}
+             */
+            status: "draft" | "published" | "archived";
+            /**
+             * Format: date-time
+             * @description Valid only when status is published; defaults to the server time when publishing.
+             */
+            publishedAt?: string | null;
+            /** Format: uuid */
+            ministryTrackId?: string | null;
+            category?: string | null;
+            /**
+             * Format: uri
+             * @description Must belong to the configured pull-zone origin matching mediaType.
+             */
+            mediaUrl?: string | null;
+            /** @enum {string|null} */
+            mediaType?: "image" | "video" | null;
+            /**
+             * Format: binary
+             * @description One JPEG, PNG, GIF, WebP, MP4, MOV, AVI, MKV, WebM, M4V, MPEG, MPG, or 3GP file with a matching MIME type. The default limit is 100 MiB and may be changed with UPLOAD_FILE_SIZE_LIMIT.
+             */
             media?: string;
         };
+        /** @description JSON update body. mediaUrl and mediaType must be provided together; set both to null to remove media. publishedAt may be changed only while the resulting status is published. */
         UpdateFieldUpdateRequest: {
             title?: string;
             tag?: string;
@@ -5010,17 +5239,41 @@ export interface components {
             /** Format: uuid */
             ministryTrackId?: string | null;
             category?: string | null;
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @description Must belong to the configured pull-zone origin matching mediaType.
+             */
             mediaUrl?: string | null;
             /** @enum {string|null} */
-            mediaType?: "image" | "video" | "audio" | "document" | null;
-            /** Format: binary */
+            mediaType?: "image" | "video" | null;
+        };
+        /** @description Multipart update body. A media file alone is a valid update. Supply either media or the mediaUrl/mediaType pair, never both. */
+        UpdateFieldUpdateMultipartRequest: {
+            title?: string;
+            tag?: string;
+            mdBody?: string;
+            /** @enum {string} */
+            status?: "draft" | "published" | "archived";
+            /** Format: date-time */
+            publishedAt?: string | null;
+            /** Format: uuid */
+            ministryTrackId?: string | null;
+            category?: string | null;
+            /**
+             * Format: uri
+             * @description Must belong to the configured pull-zone origin matching mediaType.
+             */
+            mediaUrl?: string | null;
+            /** @enum {string|null} */
+            mediaType?: "image" | "video" | null;
+            /**
+             * Format: binary
+             * @description One JPEG, PNG, GIF, WebP, MP4, MOV, AVI, MKV, WebM, M4V, MPEG, MPG, or 3GP file with a matching MIME type. The default limit is 100 MiB and may be changed with UPLOAD_FILE_SIZE_LIMIT.
+             */
             media?: string;
         };
         FieldUpdatePage: components["schemas"]["Pagination"] & {
-            fieldUpdates: {
-                [key: string]: unknown;
-            }[];
+            fieldUpdates: components["schemas"]["FieldUpdate"][];
         };
         ContactInquiryRequest: {
             name: string;

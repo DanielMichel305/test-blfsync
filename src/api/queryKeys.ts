@@ -11,6 +11,10 @@ export const queryKeys = {
     detail: (id: string) => ['ministry-tracks', 'detail', id] as const,
     commitments: (id: string, params: unknown = {}) => ['ministry-tracks', id, 'commitments', params] as const,
   },
+  units: {
+    all: ['units'] as const,
+    list: ['units', 'list'] as const,
+  },
   subscriptions: {
     all: ['subscriptions'] as const,
     list: (params: unknown = {}) => ['subscriptions', 'list', params] as const,
@@ -20,6 +24,10 @@ export const queryKeys = {
     all: ['payments'] as const,
     list: (params: unknown = {}) => ['payments', 'list', params] as const,
     detail: (id: string) => ['payments', 'detail', id] as const,
+  },
+  checkoutSessions: {
+    all: ['checkout-sessions'] as const,
+    user: (id: string, params: unknown = {}) => ['checkout-sessions', 'user', id, params] as const,
   },
   referrals: {
     all: ['referrals'] as const,
@@ -31,7 +39,14 @@ export const queryKeys = {
     tracks: (params: unknown = {}) => ['public', 'ministry-tracks', params] as const,
     announcements: (params: unknown = {}) => ['public', 'announcements', params] as const,
     testimonies: (params: unknown = {}) => ['public', 'testimonies', params] as const,
-    fieldUpdates: (params: unknown = {}) => ['public', 'field-updates', params] as const,
+  },
+  fieldUpdates: {
+    all: ['field-updates'] as const,
+    lists: () => ['field-updates', 'list'] as const,
+    userList: (params: unknown = {}) => ['field-updates', 'list', 'user', params] as const,
+    adminList: (params: unknown = {}) => ['field-updates', 'list', 'admin', params] as const,
+    details: () => ['field-updates', 'detail'] as const,
+    detail: (id: string) => ['field-updates', 'detail', id] as const,
   },
   badges: {
     all: ['badges'] as const,

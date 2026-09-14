@@ -1,5 +1,5 @@
 import type { components } from './generated';
-import type { AppNotification, Badge, Donor, Track, UpdateFeed } from '../types';
+import type { AppNotification, Badge, Donor, Subscription, Track, UpdateFeed } from '../types';
 
 type S = components['schemas'];
 
@@ -66,6 +66,28 @@ export function publicMinistryTrackToTrack(track: S['PublicMinistryTrack'], inde
     cover_url: track.cover_url,
     target_period: targetPeriod,
     is_active: track.isActive,
+  };
+}
+
+export function subscriptionCommitmentToSubscription(commitment: S['SubscriptionCommitment']): Subscription | null {
+  const subscription = commitment.subscription;
+  const trackId = subscription?.ministryTrackId || commitment.ministryTrack?.id;
+  if (
+    commitment.type !== 'recurring'
+    || !subscription
+    || !trackId
+    || subscription.amount == null
+    || !subscription.interval
+    || !['active', 'trialing', 'canceled'].includes(subscription.subscriptionStatus)
+  ) return null;
+
+  return {
+    subscription_id: subscription.id,
+    track_id: trackId,
+    amount: subscription.amount,
+    frequency: subscription.interval === 'year' ? 'annual' : 'monthly',
+    status: subscription.subscriptionStatus,
+    current_period_end: subscription.currentPeriodEnd,
   };
 }
 

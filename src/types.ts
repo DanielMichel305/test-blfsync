@@ -31,12 +31,11 @@ export interface Donor {
 
 export interface Subscription {
   subscription_id: string;
-  donor_id: string;
   track_id: string;
   amount: number;
   frequency: 'monthly' | 'annual';
-  status: 'active' | 'cancelled';
-  start_date: string;
+  status: 'pending' | 'incomplete' | 'incomplete_expired' | 'trialing' | 'active' | 'past_due' | 'unpaid' | 'paused' | 'canceled';
+  current_period_end?: string | null;
 }
 
 export interface Transaction {

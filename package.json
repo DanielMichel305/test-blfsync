@@ -5,16 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "generate:api": "openapi-typescript \"openapi copy.yaml\" -o src/api/generated.ts",
+    "generate:api": "openapi-typescript \"openapi copy 2.yaml\" -o src/api/generated.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@mdxeditor/editor": "^4.2.5",
     "@tanstack/react-query": "^5.102.8",
     "d3": "^7.9.0",
+    "dompurify": "^3.4.15",
     "lucide-react": "^0.546.0",
+    "marked": "^18.0.13",
     "motion": "^12.23.24",
     "prop-types": "^15.8.1",
     "react": "^19.0.1",
@@ -29,9 +33,11 @@
     "@types/node": "^22.14.0",
     "@types/react-simple-maps": "^3.0.6",
     "@vitejs/plugin-react": "^5.2.0",
+    "jsdom": "^29.1.1",
     "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2",
-    "vite": "^6.4.3"
+    "vite": "^6.4.3",
+    "vitest": "^5.0.0"
   }
 }
