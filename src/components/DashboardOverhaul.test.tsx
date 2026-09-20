@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../LanguageContext';
-import type { Donor, Subscription, Track } from '../types';
+import type { Badge, Donor, Subscription, Track } from '../types';
 import Dashboard, { getAccessibleDashboardSubTab } from './Dashboard';
 import Header from './Header';
 
@@ -62,14 +62,14 @@ function providers(children: React.ReactNode) {
   return <QueryClientProvider client={client}><LanguageProvider>{children}</LanguageProvider></QueryClientProvider>;
 }
 
-function dashboard(user: Donor, subscriptions: Subscription[], activeSubTab: React.ComponentProps<typeof Dashboard>['activeSubTab'] = 'dashboard', setActiveSubTab = vi.fn()) {
+function dashboard(user: Donor, subscriptions: Subscription[], activeSubTab: React.ComponentProps<typeof Dashboard>['activeSubTab'] = 'dashboard', setActiveSubTab = vi.fn(), badges: Badge[] = []) {
   return <Dashboard
     currentUser={user}
     onDonateClick={vi.fn()}
     tracks={[track]}
     subscriptions={subscriptions}
     transactions={[]}
-    badges={[]}
+    badges={badges}
     onUserChange={vi.fn()}
     activeSubTab={activeSubTab}
     setActiveSubTab={setActiveSubTab}
@@ -153,6 +153,48 @@ describe('ministry-track support cards', () => {
     const withoutDate = renderToStaticMarkup(providers(dashboard(donor('family'), [{ ...activeSubscription, current_period_end: null }])));
     expect(withoutDate).not.toContain('Renews at');
     expect(withoutDate).not.toContain('Ends at');
+  });
+});
+
+describe('badge collection', () => {
+  it('shows only badge names and statuses in the compact preview', () => {
+    const badges: Badge[] = [
+      { badge_id: 'badge-awarded', donor_id: donor('family').donor_id, badge_type: 'first-gift', name: 'First gift', description: 'Made a first gift.', earned: true, progress: { current: 1, target: 1, unit: 'actions' } },
+      { badge_id: 'badge-progress', donor_id: donor('family').donor_id, badge_type: 'faithful-supporter', name: 'Faithful supporter', description: 'Keep supporting the ministry.', earned: false, progress: { current: 2, target: 5, unit: 'days' } },
+      { badge_id: 'badge-faded', donor_id: donor('family').donor_id, badge_type: 'consistent-giver', name: 'Consistent giver', description: 'Supported faithfully over time.', earned: false, progress: { current: 0, target: 10, unit: 'actions' } },
+    ];
+
+    const markup = renderToStaticMarkup(providers(dashboard(donor('family'), [], 'dashboard', vi.fn(), badges)));
+
+    expect(markup).toContain('First gift');
+    expect(markup).toContain('Awarded');
+    expect(markup).toContain('Faithful supporter');
+    expect(markup).toContain('In progress');
+    expect(markup).toContain('2 / 5 days');
+    expect(markup).toContain('role="progressbar"');
+    expect(markup).toContain('Consistent giver');
+    expect(markup).toContain('opacity-50');
+    expect(markup).not.toContain('Made a first gift.');
+    expect(markup).toContain('View all badges');
+  });
+
+  it('opens the full badge collection with descriptions', async () => {
+    const badges: Badge[] = [
+      { badge_id: 'badge-awarded', donor_id: donor('family').donor_id, badge_type: 'first-gift', name: 'First gift', description: 'Made a first gift.', earned: true, progress: { current: 1, target: 1, unit: 'actions' } },
+      { badge_id: 'badge-progress', donor_id: donor('family').donor_id, badge_type: 'faithful-supporter', name: 'Faithful supporter', description: 'Keep supporting the ministry.', earned: false, progress: { current: 2, target: 5, unit: 'days' } },
+    ];
+    const container = await render(dashboard(donor('family'), [], 'dashboard', vi.fn(), badges));
+    const openButton = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('View all badges'));
+    if (!openButton) throw new Error('View all badges button not found');
+
+    await act(async () => { openButton.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('Made a first gift.');
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('Keep supporting the ministry.');
+
+    const closeButton = container.querySelector('[role="dialog"] button[aria-label="Close badge details"]');
+    if (!closeButton) throw new Error('Close badge details button not found');
+    await act(async () => { closeButton.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 });
 
