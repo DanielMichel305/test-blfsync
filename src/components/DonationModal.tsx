@@ -16,18 +16,18 @@ interface DonationModalProps {
   initialFrequency: 'monthly' | 'annual' | 'one-time';
   onClose: () => void;
   onSuccess: (user: Donor, badges: Badge[]) => void;
-  onOpenAuth: () => void;
 }
 
 type CheckoutState = 'ready' | 'pending' | 'completed' | 'failed' | 'expired';
 
-export default function DonationModal({ track, currentUser, initialAmount, initialFrequency, onClose, onSuccess, onOpenAuth }: DonationModalProps) {
+export default function DonationModal({ track, currentUser, initialAmount, initialFrequency, onClose, onSuccess }: DonationModalProps) {
   const { t, language } = useLanguage();
   const checkout = useCreateCheckout();
   const guestCheckout = useCreateGuestCheckout();
   const [amount, setAmount] = useState(Math.max(1, Math.round(initialAmount)));
   const [frequency, setFrequency] = useState(currentUser ? initialFrequency : 'one-time');
   const [guest, setGuest] = useState({ name: '', email: '' });
+  const [guestIdempotencyKey, setGuestIdempotencyKey] = useState(() => crypto.randomUUID());
   const [status, setStatus] = useState<CheckoutState>('ready');
   const [error, setError] = useState('');
   const [paymentRequestId, setPaymentRequestId] = useState<string | null>(null);
@@ -36,10 +36,6 @@ export default function DonationModal({ track, currentUser, initialAmount, initi
   const impact = useMemo(() => calculateSubscriptionImpact(track, amount, frequency === 'annual' ? 'annual' : 'monthly'), [track, amount, frequency]);
 
   const startCheckout = async () => {
-    if (!currentUser) {
-      onOpenAuth();
-      return;
-    }
     if (!Number.isInteger(amount) || amount < minimum || amount > 999999) {
       setError(t(`Enter a whole USD amount from $${minimum} to $999,999.`, `أدخل مبلغاً صحيحاً بالدولار من ${minimum}$ إلى 999,999$.`));
       return;
@@ -54,10 +50,11 @@ export default function DonationModal({ track, currentUser, initialAmount, initi
           setError(t('Enter your name and a valid email address.', 'أدخل اسمك وعنوان بريد إلكتروني صالحاً.'));
           return;
         }
-        const result = await guestCheckout.mutateAsync({ name: guest.name.trim(), email: guest.email.trim(), amount, currency: 'usd', ministryTrackId: track.track_id, idempotencyKey: crypto.randomUUID(), type: 'one-time' });
+        const guestInput = { name: guest.name.trim(), email: guest.email.trim(), amount, currency: 'usd' as const, ministryTrackId: track.track_id, idempotencyKey: guestIdempotencyKey, type: 'one-time' as const };
+        const result = await guestCheckout.mutateAsync(guestInput);
         setStatus(result.status);
         setPaymentRequestId(result.paymentRequestId);
-        localStorage.setItem(PENDING_CHECKOUT_KEY, JSON.stringify({ paymentRequestId: result.paymentRequestId, guestCheckoutId: result.guestCheckoutId, verificationToken: result.verificationToken, ministryTrackId: track.track_id, amount, frequency: 'one-time' }));
+        sessionStorage.setItem(PENDING_CHECKOUT_KEY, JSON.stringify({ paymentRequestId: result.paymentRequestId, guestCheckoutId: result.guestCheckoutId, verificationToken: result.verificationToken, ministryTrackId: track.track_id, amount, frequency: 'one-time', guestInput }));
         window.location.assign(result.status === 'pending' ? result.checkout.url : '/payments/success');
         return;
       }
@@ -114,13 +111,13 @@ export default function DonationModal({ track, currentUser, initialAmount, initi
                   </div>
                 </div>
 
-                {!currentUser && <div className="grid gap-3 sm:grid-cols-2"><label className="text-[10px] font-bold uppercase tracking-widest text-editorial-charcoal/50">{t('Your name', 'اسمك')}<input required value={guest.name} onChange={event => setGuest(value => ({ ...value, name: event.target.value }))} className="mt-2 w-full rounded-xl border bg-transparent p-3 text-xs font-normal normal-case tracking-normal" /></label><label className="text-[10px] font-bold uppercase tracking-widest text-editorial-charcoal/50">{t('Email', 'البريد الإلكتروني')}<input required type="email" value={guest.email} onChange={event => setGuest(value => ({ ...value, email: event.target.value }))} className="mt-2 w-full rounded-xl border bg-transparent p-3 text-xs font-normal normal-case tracking-normal" /></label></div>}
+                {!currentUser && <div className="grid gap-3 sm:grid-cols-2"><label className="text-[10px] font-bold uppercase tracking-widest text-editorial-charcoal/50">{t('Your name', 'اسمك')}<input required value={guest.name} onChange={event => { setGuest(value => ({ ...value, name: event.target.value })); setGuestIdempotencyKey(crypto.randomUUID()); }} className="mt-2 w-full rounded-xl border bg-transparent p-3 text-xs font-normal normal-case tracking-normal" /></label><label className="text-[10px] font-bold uppercase tracking-widest text-editorial-charcoal/50">{t('Email', 'البريد الإلكتروني')}<input required type="email" value={guest.email} onChange={event => { setGuest(value => ({ ...value, email: event.target.value })); setGuestIdempotencyKey(crypto.randomUUID()); }} className="mt-2 w-full rounded-xl border bg-transparent p-3 text-xs font-normal normal-case tracking-normal" /></label></div>}
 
                 <div>
                   <label htmlFor="checkout-amount" className="text-[10px] font-bold uppercase tracking-widest text-editorial-charcoal/50">{t('Amount (USD)', 'المبلغ (دولار)')}</label>
                   <div className="mt-2 flex items-center rounded-2xl border border-editorial-charcoal/15 bg-editorial-cream px-4">
                     <span className="font-serif text-2xl text-editorial-charcoal/50">$</span>
-                    <input id="checkout-amount" type="number" step="1" min={minimum} max={999999} value={amount} onChange={event => { setAmount(Math.round(Number(event.target.value))); setStatus('ready'); }} className="w-full bg-transparent px-3 py-4 text-3xl font-serif outline-none" />
+                    <input id="checkout-amount" type="number" step="1" min={minimum} max={999999} value={amount} onChange={event => { setAmount(Math.round(Number(event.target.value))); setGuestIdempotencyKey(crypto.randomUUID()); setStatus('ready'); }} className="w-full bg-transparent px-3 py-4 text-3xl font-serif outline-none" />
                   </div>
                   <p className="mt-2 text-[10px] text-editorial-charcoal/50">{t('Minimum', 'الحد الأدنى')}: ${minimum.toLocaleString()} USD</p>
                 </div>
@@ -134,6 +131,8 @@ export default function DonationModal({ track, currentUser, initialAmount, initi
                   <p className="font-bold text-editorial-charcoal">{t('Review before checkout', 'راجع التفاصيل قبل الدفع')}</p>
                   <p className="mt-1">{getLocalizedTrackName(track.track_id, track.name, language)} · ${amount.toLocaleString()} USD · {frequency === 'one-time' ? t('one-time gift', 'عطاء لمرة واحدة') : frequency === 'annual' ? t('annual gift', 'عطاء سنوي') : t('monthly gift', 'عطاء شهري')}</p>
                 </div>
+
+                {!currentUser && <p className="border-t border-editorial-charcoal/10 pt-4 text-center text-[10px] leading-relaxed text-editorial-charcoal/55">{t('Guest gifts are one-time only. Become a member to create recurring gifts and track your generosity and spiritual growth.', 'عطاءات الزائر لمرة واحدة فقط. انضم كعضو لإنشاء عطاءات متكررة ومتابعة عطائك ونموك الروحي.')}</p>}
 
                 {error && <div role="alert" className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-700 dark:text-rose-300">{error}</div>}
                 {status === 'failed' && !error && <div role="alert" className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-700 dark:text-rose-300">{t('The checkout attempt failed. You can try again with a new request.', 'فشلت محاولة الدفع. يمكنك المحاولة مرة أخرى بطلب جديد.')}</div>}

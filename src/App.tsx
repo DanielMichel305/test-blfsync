@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAnnouncements, useCreateCheckout, useMinistryTracks, usePublicAnnouncements, usePublicTestimonies, usePublicTracks, useSessionRestore, useSubscriptions, useTestimonies, useUserBadges } from './api/hooks';
 import { ApiError } from './api/client';
 import { announcementToUpdate, ministryTrackToTrack, publicMinistryTrackToTrack, subscriptionCommitmentToSubscription, testimonyToUpdate, userBadgeToBadge, userToDonor } from './api/adapters';
+import DonationModal from './components/DonationModal';
 
 const LandingPage = lazy(() => import('./components/LandingPage'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -20,6 +21,7 @@ const PrayerThreadPage = lazy(() => import('./components/PrayerWall').then(modul
 
 type AppTab = 'landing' | 'dashboard' | 'admin';
 type DashboardSubTab = 'dashboard' | 'overview' | 'profile' | 'referrals' | 'prayer';
+type DonationIntent = { track: Track; amount: number; frequency: 'monthly' | 'annual' | 'one-time' };
 
 const dashboardRoutes: Record<DashboardSubTab, string> = {
   dashboard: '/dashboard', overview: '/', profile: '/profile', referrals: '/referrals', prayer: '/prayer',
@@ -64,7 +66,9 @@ export default function App() {
   const isPrayerThreadRoute = /^\/prayer-wall\/[^/]+\/?$/.test(pathname);
   const isAdminRoute = pathname === '/admin' || /^\/(users|tracks)\/[^/]+\/?$/.test(pathname) || (isPrayerThreadRoute && currentUser?.role === 'admin');
   const isLoginRoute = pathname === '/login';
-  const activeTab: AppTab = isAdminRoute ? 'admin' : dashboardSubTab ? 'dashboard' : 'landing';
+  const isJoinRoute = pathname === '/join';
+  const isAuthRoute = isLoginRoute || isJoinRoute;
+  const activeTab: AppTab = isAdminRoute ? 'admin' : (isDashboardRoute || isAuthRoute) ? 'dashboard' : 'landing';
   const selectedUserId = pathname.match(/^\/users\/([^/]+)\/?$/)?.[1];
   const selectedTrackId = pathname.match(/^\/tracks\/([^/]+)\/?$/)?.[1];
   const selectedPrayerThreadId = pathname.match(/^\/prayer-wall\/([^/]+)\/?$/)?.[1];
@@ -85,7 +89,7 @@ export default function App() {
   const authenticated = !!currentUser;
   const dashboardDataNeeded = dashboardSubTab === 'dashboard';
   const tracksNeeded = dashboardDataNeeded || dashboardSubTab === 'overview' || isAdminRoute;
-  const publicContentNeeded = pathname === '/' || isLoginRoute;
+  const publicContentNeeded = pathname === '/' || isAuthRoute;
   const tracksQuery = useMinistryTracks({ page: 1, limit: 100 }, authenticated && tracksNeeded);
   const publicTracksQuery = usePublicTracks({ page: 1, limit: 100 }, !authenticated && publicContentNeeded);
   const subscriptionsQuery = useSubscriptions({ page: 1, limit: 100, type: 'recurring' }, authenticated && dashboardSubTab === 'dashboard');
@@ -96,7 +100,7 @@ export default function App() {
   const publicTestimoniesQuery = usePublicTestimonies({ page: 1, limit: 20 }, !authenticated && dashboardDataNeeded);
 
   const tracks: Track[] = authenticated ? (tracksQuery.data?.ministryTracks || []).map(ministryTrackToTrack) : (publicTracksQuery.data?.ministryTracks || []).map(publicMinistryTrackToTrack);
-  const badges: Badge[] = (badgesQuery.data || []).filter(badge => badge.earned).map(badge => userBadgeToBadge(badge, currentUser?.donor_id || ''));
+  const badges: Badge[] = (badgesQuery.data || []).map(badge => userBadgeToBadge(badge, currentUser?.donor_id || ''));
   const updates: UpdateFeed[] = [
     ...((authenticated ? announcementsQuery.data : publicAnnouncementsQuery.data)?.announcements || []).map(announcementToUpdate),
     ...((authenticated ? testimoniesQuery.data : publicTestimoniesQuery.data)?.testimonies || []).map(testimonyToUpdate),
@@ -114,6 +118,7 @@ export default function App() {
   const leaderboard: LeaderboardEntry[] = [];
 
   const [checkoutError, setCheckoutError] = useState<{ message: string; tooltip: string } | null>(null);
+  const [guestDonation, setGuestDonation] = useState<DonationIntent | null>(null);
 
   const { t } = useLanguage();
   const [unlockedBadgeNotify] = useState<Badge | null>(null);
@@ -174,7 +179,7 @@ export default function App() {
 
   const handleDonateTrigger = async (track: Track, amount: number, frequency: 'monthly' | 'annual' | 'one-time', isGuest: boolean = false) => {
     if (!currentUser || isGuest) {
-      navigate('/login');
+      setGuestDonation({ track, amount, frequency: 'one-time' });
       return;
     }
     setCheckoutError(null);
@@ -239,7 +244,7 @@ export default function App() {
       <Header
         currentUser={currentUser}
         onUserChange={handleUserChange}
-        onOpenAuth={() => setActiveTab('dashboard')}
+        onOpenAuth={() => navigate('/join')}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         dashboardSubTab={dashboardSubTab ?? 'overview'}
@@ -251,7 +256,7 @@ export default function App() {
 
       <main
         id="app-main-content"
-        className={`flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 w-full ${currentUser ? 'pb-24 md:pb-8' : 'pb-8'}`}
+        className={`flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full ${pathname === '/' ? 'pt-0' : 'pt-4'} ${currentUser ? 'pb-24 md:pb-8' : 'pb-8'}`}
       >
         {(tracksQuery.error || subscriptionsQuery.error || announcementsQuery.error || testimoniesQuery.error) && currentUser && (
           <div role="alert" className="mb-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-xs text-rose-800 dark:text-rose-300">
@@ -283,14 +288,14 @@ export default function App() {
                 subscriptions={subscriptions}
                 transactions={transactions}
                 badges={badges}
-                onOpenAuth={() => navigate('/login')}
+                onOpenAuth={() => navigate('/join')}
                 onUserChange={handleUserChange}
               /></Suspense>
             </motion.div>
           )}
 
-          {(isDashboardRoute || isLoginRoute) && (
-            (!currentUser || isLoginRoute) ? (
+          {(isDashboardRoute || isAuthRoute) && (
+            (!currentUser || isAuthRoute) ? (
               <motion.div
                 key="login"
                 initial={{ opacity: 0, y: 15 }}
@@ -367,8 +372,16 @@ export default function App() {
               </motion.div>
             )
           )}
-          {!dashboardSubTab && !isLoginRoute && !isAdminRoute && !isPrayerThreadRoute && <motion.div key="not-found" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Suspense fallback={<RouteLoader />}><NotFoundPage onGoHome={() => navigate('/')} /></Suspense></motion.div>}
+          {!dashboardSubTab && !isAuthRoute && !isAdminRoute && !isPrayerThreadRoute && <motion.div key="not-found" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Suspense fallback={<RouteLoader />}><NotFoundPage onGoHome={() => navigate('/')} /></Suspense></motion.div>}
         </AnimatePresence>
+        {guestDonation && <DonationModal
+          track={guestDonation.track}
+          currentUser={null}
+          initialAmount={guestDonation.amount}
+          initialFrequency={guestDonation.frequency}
+          onClose={() => setGuestDonation(null)}
+          onSuccess={() => setGuestDonation(null)}
+        />}
       </main>
 
       <footer id="app-footer" className="bg-editorial-charcoal text-editorial-cream/40 text-[9px] uppercase tracking-widest py-4 mt-8 font-sans">
