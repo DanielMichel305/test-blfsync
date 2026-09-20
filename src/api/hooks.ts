@@ -156,7 +156,14 @@ export function useCreateCheckout() {
   });
 }
 export const useCreateGuestCheckout = () => useMutation({ mutationFn: guestCheckoutsApi.create });
-export const useGuestPayment = (id: string, token: string, enabled = true) => useQuery({ queryKey: queryKeys.payments.detail(`guest:${id}`), queryFn: () => guestCheckoutsApi.payment(id, token), enabled: enabled && !!id && !!token, refetchInterval: query => query.state.data?.status === 'pending' ? 4000 : false });
+export const useGuestPayment = (id: string, token: string, enabled = true) => useQuery({
+  queryKey: queryKeys.payments.detail(`guest:${id}`),
+  queryFn: () => guestCheckoutsApi.payment(id, token),
+  enabled: enabled && !!id && !!token,
+  // Stripe may complete the payment before its hosted receipt is attached to
+  // the sanitized projection. Keep reconciling until both are available.
+  refetchInterval: query => query.state.data?.status === 'pending' || !query.state.data?.receipt?.available || !query.state.data?.receipt?.url ? 4000 : false,
+});
 export const usePayments = (params: ListParams = {}, enabled = true) => useQuery({
   queryKey: queryKeys.payments.list(params),
   queryFn: () => paymentsApi.list(params),

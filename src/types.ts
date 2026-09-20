@@ -18,13 +18,23 @@ export interface Donor {
   donor_id: string;
   name: string;
   email: string;
+  first_name?: string;
+  last_name?: string | null;
+  username?: string | null;
   phone?: string;
   join_date: string;
   communication_opt_in?: boolean;
   referral_source?: string;
+  inviter?: { id: string; first_name: string; last_name: string | null } | null;
   avatar_url?: string;
   role: 'donor' | 'admin';
   api_role: 'admin' | 'family' | 'friend';
+  is_active?: boolean;
+  two_factor_enabled?: boolean;
+  last_login_at?: string | null;
+  has_password?: boolean;
+  invitation_pending?: boolean;
+  updated_at?: string;
   streak?: number;
   last_donation_date?: string | null;
 }
@@ -52,12 +62,22 @@ export interface Transaction {
 
 export type BadgeType = string;
 
+export interface BadgeProgress {
+  current: number;
+  target: number;
+  unit: 'days' | 'actions';
+  membershipStartedAt?: string;
+  ministryTrackId?: string;
+}
+
 export interface Badge {
   badge_id: string;
   donor_id: string;
   badge_type: BadgeType;
   name: string;
   description: string;
+  earned: boolean;
+  progress: BadgeProgress;
   earned_date?: string;
 }
 

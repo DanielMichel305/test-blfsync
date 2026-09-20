@@ -4233,7 +4233,7 @@ export interface components {
             description: string;
             order: number;
             /** @enum {string} */
-            triggerKey: "ministry.track.duration" | "action.login" | "action.donation";
+            triggerKey: "ministry.track.duration" | "action.login" | "action.donation" | "action.referral";
             /** @description Trigger-specific configuration validated by the badge trigger registry. */
             requirementConfig: {
                 [key: string]: unknown;
@@ -4253,7 +4253,7 @@ export interface components {
             /** @default 0 */
             order: number;
             /** @enum {string} */
-            triggerKey: "ministry.track.duration" | "action.login" | "action.donation";
+            triggerKey: "ministry.track.duration" | "action.login" | "action.donation" | "action.referral";
             requirementConfig: {
                 [key: string]: unknown;
             };
@@ -4266,7 +4266,7 @@ export interface components {
             description?: string;
             order?: number;
             /** @enum {string} */
-            triggerKey?: "ministry.track.duration" | "action.login" | "action.donation";
+            triggerKey?: "ministry.track.duration" | "action.login" | "action.donation" | "action.referral";
             requirementConfig?: {
                 [key: string]: unknown;
             };
@@ -4405,6 +4405,12 @@ export interface components {
             lastLoginAt?: string | null;
             hasPassword: boolean;
             invitationPending: boolean;
+            /** @example +12025550123 */
+            phone: string | null;
+            /** Format: uuid */
+            referralSource: string | null;
+            inviter: components["schemas"]["UserInviter"] | null;
+            communicationOptIn: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -4417,6 +4423,12 @@ export interface components {
             lastName?: string | null;
             /** Format: email */
             email: string;
+        };
+        UserInviter: {
+            /** Format: uuid */
+            id: string;
+            firstName: string;
+            lastName: string | null;
         };
         LoginRequest: {
             /** Format: email */
@@ -4512,7 +4524,6 @@ export interface components {
             removeProfilePicture?: boolean;
             /** @example +12025550123 */
             phone?: string | null;
-            referralSource?: string | null;
             communicationOptIn?: boolean;
         };
         UserPage: components["schemas"]["Pagination"] & {
@@ -4527,6 +4538,16 @@ export interface components {
             description: string;
             order: number;
             earned: boolean;
+            progress: {
+                current: number;
+                target: number;
+                /** @enum {string} */
+                unit: "days" | "actions";
+                /** Format: date-time */
+                membershipStartedAt?: string;
+                /** Format: uuid */
+                ministryTrackId?: string;
+            };
         };
         ResendInvitationRequest: {
             expiresInHours?: number;
@@ -4968,7 +4989,6 @@ export interface components {
             lastName?: string | null;
             /** @example +12025550123 */
             phone?: string | null;
-            referralSource?: string | null;
             communicationOptIn?: boolean;
             removeProfilePicture?: boolean;
             /** Format: binary */

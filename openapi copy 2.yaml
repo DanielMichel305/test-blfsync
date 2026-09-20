@@ -3132,7 +3132,7 @@ components:
                     minimum: 0
                 triggerKey:
                     type: string
-                    enum: [ministry.track.duration, action.login, action.donation]
+                    enum: [ministry.track.duration, action.login, action.donation, action.referral]
                 requirementConfig:
                     type: object
                     additionalProperties: true
@@ -3172,7 +3172,7 @@ components:
                     default: 0
                 triggerKey:
                     type: string
-                    enum: [ministry.track.duration, action.login, action.donation]
+                    enum: [ministry.track.duration, action.login, action.donation, action.referral]
                 requirementConfig:
                     type: object
                     additionalProperties: true
@@ -3201,7 +3201,7 @@ components:
                     minimum: 0
                 triggerKey:
                     type: string
-                    enum: [ministry.track.duration, action.login, action.donation]
+                    enum: [ministry.track.duration, action.login, action.donation, action.referral]
                 requirementConfig:
                     type: object
                     additionalProperties: true
@@ -3477,6 +3477,10 @@ components:
                 - isActive
                 - hasPassword
                 - invitationPending
+                - phone
+                - referralSource
+                - inviter
+                - communicationOptIn
                 - createdAt
                 - updatedAt
             properties:
@@ -3515,6 +3519,20 @@ components:
                     type: boolean
                 invitationPending:
                     type: boolean
+                phone:
+                    type: string
+                    nullable: true
+                    example: '+12025550123'
+                referralSource:
+                    type: string
+                    format: uuid
+                    nullable: true
+                inviter:
+                    allOf:
+                        - $ref: '#/components/schemas/UserInviter'
+                    nullable: true
+                communicationOptIn:
+                    type: boolean
                 createdAt:
                     type: string
                     format: date-time
@@ -3536,6 +3554,18 @@ components:
                 email:
                     type: string
                     format: email
+        UserInviter:
+            type: object
+            required: [id, firstName, lastName]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                firstName:
+                    type: string
+                lastName:
+                    type: string
+                    nullable: true
         LoginRequest:
             type: object
             additionalProperties: false
@@ -3728,10 +3758,6 @@ components:
                     type: string
                     nullable: true
                     example: '+12025550123'
-                referralSource:
-                    type: string
-                    maxLength: 100
-                    nullable: true
                 communicationOptIn:
                     type: boolean
         UserPage:
@@ -3748,7 +3774,7 @@ components:
                               $ref: '#/components/schemas/User'
         UserBadge:
             type: object
-            required: [id, code, name, description, order, earned]
+            required: [id, code, name, description, order, earned, progress]
             properties:
                 id:
                     type: string
@@ -3763,6 +3789,25 @@ components:
                     type: integer
                 earned:
                     type: boolean
+                progress:
+                    type: object
+                    required: [current, target, unit]
+                    properties:
+                        current:
+                            type: integer
+                            minimum: 0
+                        target:
+                            type: integer
+                            minimum: 0
+                        unit:
+                            type: string
+                            enum: [days, actions]
+                        membershipStartedAt:
+                            type: string
+                            format: date-time
+                        ministryTrackId:
+                            type: string
+                            format: uuid
         ResendInvitationRequest:
             type: object
             additionalProperties: false
@@ -4716,7 +4761,6 @@ components:
                 firstName: { type: string, minLength: 1, maxLength: 50 }
                 lastName: { type: string, maxLength: 50, nullable: true }
                 phone: { type: string, nullable: true, example: '+12025550123' }
-                referralSource: { type: string, maxLength: 100, nullable: true }
                 communicationOptIn: { type: boolean }
                 removeProfilePicture: { type: boolean }
                 profilePictureUrl: { type: string, format: binary }
@@ -4800,13 +4844,14 @@ components:
                 status:
                     {
                         type: string,
-                        enum: [pending, completed, failed, expired, refunded, partially_refunded],
+                        enum: [pending, confirmed, completed, failed, expired, refunded, partially_refunded],
                     }
                 type: { type: string, enum: [one-time, recurring] }
                 interval: { type: string, enum: [month, year], nullable: true }
                 amount: { type: number }
                 amountMinor: { type: integer }
                 currency: { type: string }
+                occurredAt: { type: string, format: date-time }
                 commitment: { type: object, nullable: true, additionalProperties: true }
                 subscription:
                     allOf:

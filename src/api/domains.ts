@@ -4,7 +4,8 @@ import { getRefreshToken, storeTokens } from './session';
 
 type S = components['schemas'];
 export type MinistryUnit = { id: string; name: string };
-export type CreateMinistryTrackInput = Omit<S['CreateMinistryTrackRequest'], 'metricUnit'> & { unitId: string };
+export type CreateMinistryTrackInput = Omit<S['CreateMinistryTrackRequest'], 'cover_url'> & { cover_url?: string | null; coverImage?: File };
+export type UpdateMinistryTrackInput = Omit<S['UpdateMinistryTrackRequest'], 'cover_url'> & { cover_url?: string | null; coverImage?: File };
 type MinistryUnitsResponse = MinistryUnit[] | { units?: MinistryUnit[] };
 type MinistryUnitResponse = MinistryUnit | { unit?: MinistryUnit };
 type PageParams = { page?: number; limit?: number };
@@ -81,8 +82,14 @@ export const authApi = {
 export const ministryTracksApi = {
   list: (params: ListParams = {}) => apiRequest<S['MinistryTrackPage']>(withQuery('/ministry-tracks', params)),
   get: (id: string) => apiRequest<S['MinistryTrack']>(`/ministry-tracks/${id}`),
-  create: (input: CreateMinistryTrackInput) => apiRequest<S['MinistryTrack']>('/ministry-tracks', { method: 'POST', body: input }),
-  update: (id: string, input: S['UpdateMinistryTrackRequest']) => apiRequest<S['MinistryTrack']>(`/ministry-tracks/${id}`, { method: 'PATCH', body: input }),
+  create: (input: CreateMinistryTrackInput) => {
+    const { coverImage, ...fields } = input;
+    return apiRequest<S['MinistryTrack']>('/ministry-tracks', { method: 'POST', body: coverImage ? toFormData({ ...fields, coverImage }) : fields });
+  },
+  update: (id: string, input: UpdateMinistryTrackInput) => {
+    const { coverImage, ...fields } = input;
+    return apiRequest<S['MinistryTrack']>(`/ministry-tracks/${id}`, { method: 'PATCH', body: coverImage ? toFormData({ ...fields, coverImage }) : fields });
+  },
   delete: (id: string) => apiRequest<{ message: string }>(`/ministry-tracks/${id}`, { method: 'DELETE' }),
   commitments: (id: string, params: PageParams = {}) => apiRequest<S['MinistryTrackCommitments']>(withQuery(`/ministry-tracks/${id}/commitments`, params)),
 };
