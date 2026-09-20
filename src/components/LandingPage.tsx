@@ -414,7 +414,8 @@ export default function LandingPage({
 
         
         
-        <section id="interactive-impact-sandbox" className="max-w-6xl mx-auto px-4 sm:px-6 mb-16 lg:mb-24">
+        <section id="donation-section" className="max-w-6xl mx-auto scroll-mt-24 px-4 sm:px-6 mb-16 lg:mb-24">
+        <div id="interactive-impact-sandbox">
         {/* Main interactive area wrapper with a subtle background and padding to make it a distinct segment */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
                  
@@ -618,6 +619,7 @@ export default function LandingPage({
                 </div>
               </div>
           </div>
+        </div>
         </section>
       <AnimatePresence>
         {selectedTrackModal && (
