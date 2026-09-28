@@ -1,8 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { Archive, Pencil, RefreshCw, Send, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Archive, Pencil, Play, RefreshCw, Send, Trash2 } from 'lucide-react';
 import type { components } from '../../api/generated';
+import { ApiError } from '../../api/client';
+import { getApiErrorMessage } from '../../api/errors';
 import { type AuditLogListParams, type BadgeListParams, type ManagedNotificationListParams, useAuditLogs, useBadgeDefinitions, useCreateAdminNotification, useCreateBadge, useCreateInvitation, useDeleteBadge, useInvitations, useManagedNotifications, useResendInvitation, useRetireBadge, useRevokeInvitation, useUpdateBadge } from '../../api/hooks';
 import { AdminListControls, AdminListState, AdminPagination, FilterField, useAdminListState } from './AdminList';
+import { BadgeForm } from './BadgeForm';
+import { badgeToForm, newBadgeForm } from './badgeRules';
 import { ConfirmDialog } from './ConfirmDialog';
 
 type S = components['schemas']; type Badge = S['Badge']; type BadgeInput = S['CreateBadgeRequest'];
@@ -17,15 +21,87 @@ export function AdminInvitations() {
   </div>;
 }
 
-function BadgeForm({ initial, locked, onCancel, onSubmit, busy }: { initial: BadgeInput; locked: boolean; onCancel: () => void; onSubmit: (input: BadgeInput) => Promise<void>; busy: boolean }) {
-  const [form, setForm] = useState(initial); const [config, setConfig] = useState(JSON.stringify(initial.requirementConfig, null, 2)); const [error, setError] = useState(''); useEffect(() => { setForm(initial); setConfig(JSON.stringify(initial.requirementConfig, null, 2)); }, [initial]);
-  return <form onSubmit={event => { event.preventDefault(); try { const requirementConfig = JSON.parse(config); setError(''); onSubmit({ ...form, requirementConfig }); } catch { setError('Requirement configuration must be valid JSON.'); } }} className="grid gap-3 rounded-2xl border bg-editorial-card p-4 md:grid-cols-2"><input required placeholder="Code" disabled={locked} value={form.code} onChange={e => setForm(v => ({ ...v, code: e.target.value }))} className="rounded-xl border bg-transparent p-2 disabled:opacity-50" /><input required placeholder="Name" value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))} className="rounded-xl border bg-transparent p-2" /><textarea required placeholder="Description" value={form.description} onChange={e => setForm(v => ({ ...v, description: e.target.value }))} className="rounded-xl border bg-transparent p-2 md:col-span-2" /><select disabled={locked} value={form.triggerKey} onChange={e => setForm(v => ({ ...v, triggerKey: e.target.value as BadgeInput['triggerKey'] }))} className="rounded-xl border bg-editorial-card p-2 disabled:opacity-50"><option value="ministry.track.duration">Track duration</option><option value="action.login">Login</option><option value="action.donation">Donation</option></select><input type="number" min="0" value={form.order || 0} onChange={e => setForm(v => ({ ...v, order: Number(e.target.value) }))} className="rounded-xl border bg-transparent p-2" /><textarea required disabled={locked} value={config} onChange={e => setConfig(e.target.value)} className="rounded-xl border bg-transparent p-2 font-mono text-xs md:col-span-2 disabled:opacity-50" />{error && <p className="text-xs text-rose-600 md:col-span-2">{error}</p>}<div className="flex justify-end gap-2 md:col-span-2"><button type="button" onClick={onCancel} className="rounded-full border px-4 py-2 text-xs">Cancel</button><button disabled={busy} className="rounded-full bg-editorial-charcoal px-4 py-2 text-xs text-editorial-cream">Save badge</button></div></form>;
+type BadgeAction = 'save' | 'activate' | 'retire' | 'delete';
+
+function badgeActionError(cause: unknown, action: BadgeAction) {
+  if (!(cause instanceof ApiError)) return getApiErrorMessage(cause, 'Badge action failed.');
+  const detail = cause.message && cause.message !== cause.code ? ` ${cause.message}` : '';
+  if (cause.status === 400) return `The badge rule is invalid. Review the selected trigger and all rule values.${detail}`;
+  if (cause.status === 404) return `The badge or selected ministry track could not be found.${detail}`;
+  if (cause.status === 409 && action === 'delete') return `This badge cannot be deleted while it is active or has user awards.${detail}`;
+  if (cause.status === 409) return `The badge code is already in use, or its lifecycle no longer permits this change.${detail}`;
+  return getApiErrorMessage(cause, 'Badge action failed.');
+}
+
+export function badgeLifecycle(badge: Badge): 'Draft' | 'Active' | 'Retired' {
+  if (badge.isActive) return 'Active';
+  return badge.definitionLockedAt ? 'Retired' : 'Draft';
 }
 
 export function AdminBadges() {
-  const { query, update } = useAdminListState('badges', { page: 1, limit: 20, search: '', isActive: '', sortBy: 'createdAt', sortOrder: 'DESC' }); const list = useBadgeDefinitions({ ...query, isActive: query.isActive === '' ? undefined : query.isActive === 'true' } as BadgeListParams); const create = useCreateBadge(); const save = useUpdateBadge(); const retire = useRetireBadge(); const remove = useDeleteBadge(); const [editing, setEditing] = useState<Badge | 'new' | null>(null); const [confirm, setConfirm] = useState<{ id: string; action: 'retire' | 'delete' } | null>(null); const [error, setError] = useState(''); const run = async (operation: () => Promise<unknown>) => { setError(''); try { await operation(); setEditing(null); setConfirm(null); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Badge action failed.'); } };
-  const initial: BadgeInput | null = editing === 'new' ? { code: '', name: '', description: '', order: 0, triggerKey: 'action.donation', requirementConfig: {}, isActive: true } : editing ? { code: editing.code, name: editing.name, description: editing.description, order: editing.order, triggerKey: editing.triggerKey, requirementConfig: editing.requirementConfig, isActive: editing.isActive } : null;
-  return <div className="space-y-4"><div className="flex justify-between"><h2 className="text-2xl font-serif">Badge definitions</h2><button onClick={() => setEditing('new')} className="rounded-full bg-editorial-charcoal px-4 py-2 text-xs text-editorial-cream">Create badge</button></div>{initial && <BadgeForm initial={initial} locked={editing !== 'new' && !!(editing as Badge).definitionLockedAt} busy={create.isPending || save.isPending} onCancel={() => setEditing(null)} onSubmit={input => run(() => editing === 'new' ? create.mutateAsync(input) : save.mutateAsync({ id: (editing as Badge).id, input }))} />}<AdminListControls query={query} onChange={update}><FilterField label="Active"><select value={query.isActive} onChange={e => update({ isActive: e.target.value })}><option value="">All</option><option value="true">Active</option><option value="false">Retired</option></select></FilterField><FilterField label="Sort by"><select value={query.sortBy} onChange={e => update({ sortBy: e.target.value })}><option>createdAt</option><option>name</option><option>order</option><option>isActive</option></select></FilterField><FilterField label="Order"><select value={query.sortOrder} onChange={e => update({ sortOrder: e.target.value })}><option>DESC</option><option>ASC</option></select></FilterField></AdminListControls>{error && <p className="text-xs text-rose-600">{error}</p>}<AdminListState loading={list.isLoading} error={list.error} empty={!list.data?.badges.length}><div className="space-y-3">{list.data?.badges.map(item => <article key={item.id} className="flex items-center gap-3 rounded-2xl border bg-editorial-card p-4"><div className="flex-1"><p className="text-sm font-bold">{item.name}</p><p className="text-[10px] text-editorial-charcoal/50">{item.code} · order {item.order} · {item.isActive ? 'active' : 'retired'}</p></div><button onClick={() => setEditing(item)}><Pencil className="h-4 w-4" /></button>{item.isActive ? <button onClick={() => setConfirm({ id: item.id, action: 'retire' })}><Archive className="h-4 w-4" /></button> : <button onClick={() => setConfirm({ id: item.id, action: 'delete' })}><Trash2 className="h-4 w-4 text-rose-600" /></button>}</article>)}</div></AdminListState>{list.data && <AdminPagination page={list.data.page} limit={list.data.limit} total={list.data.total} totalPages={list.data.totalPages} onChange={update} />}<ConfirmDialog open={!!confirm} title={confirm?.action === 'retire' ? 'Retire badge?' : 'Delete badge?'} description={confirm?.action === 'retire' ? 'Existing awards remain, but this definition becomes inactive.' : 'Only retired, unawarded badges can be deleted.'} destructive confirmLabel={confirm?.action} busy={retire.isPending || remove.isPending} onCancel={() => setConfirm(null)} onConfirm={() => confirm && run(() => confirm.action === 'retire' ? retire.mutateAsync(confirm.id) : remove.mutateAsync(confirm.id))} /></div>;
+  const { query, update } = useAdminListState('badges', { page: 1, limit: 20, search: '', isActive: '', sortBy: 'createdAt', sortOrder: 'DESC' });
+  const list = useBadgeDefinitions({ ...query, isActive: query.isActive === '' ? undefined : query.isActive === 'true' } as BadgeListParams);
+  const create = useCreateBadge();
+  const save = useUpdateBadge();
+  const retire = useRetireBadge();
+  const remove = useDeleteBadge();
+  const [editing, setEditing] = useState<Badge | 'new' | null>(null);
+  const [confirm, setConfirm] = useState<{ id: string; action: 'activate' | 'retire' | 'delete' } | null>(null);
+  const [error, setError] = useState('');
+  const run = async (action: BadgeAction, operation: () => Promise<unknown>) => {
+    setError('');
+    try {
+      await operation();
+      setEditing(null);
+      setConfirm(null);
+    } catch (cause) {
+      setError(badgeActionError(cause, action));
+    }
+  };
+  const initial = editing === 'new' ? newBadgeForm() : editing ? badgeToForm(editing) : null;
+  const locked = editing !== null && editing !== 'new' && !!editing.definitionLockedAt;
+  const submit = async (input: BadgeInput) => {
+    if (editing === 'new') return run('save', () => create.mutateAsync(input));
+    if (!editing) return;
+    const updateInput: S['UpdateBadgeRequest'] = locked
+      ? { name: input.name, description: input.description, order: input.order }
+      : { code: input.code, name: input.name, description: input.description, order: input.order, triggerKey: input.triggerKey, requirementConfig: input.requirementConfig };
+    return run('save', () => save.mutateAsync({ id: editing.id, input: updateInput }));
+  };
+  const confirmTitle = confirm?.action === 'activate' ? 'Activate badge?' : confirm?.action === 'retire' ? 'Retire badge?' : 'Delete badge?';
+  const confirmDescription = confirm?.action === 'activate'
+    ? 'Activation makes this badge eligible for awards and permanently locks its code, trigger, and rule settings.'
+    : confirm?.action === 'retire'
+      ? 'Existing awards remain, but this definition becomes inactive and its rule stays locked.'
+      : 'Deletion succeeds only while the badge is inactive and has no user awards.';
+  const confirmBusy = save.isPending || retire.isPending || remove.isPending;
+  return <div className="space-y-4">
+    <div className="flex justify-between"><h2 className="text-2xl font-serif">Badge definitions</h2><button type="button" onClick={() => setEditing('new')} className="rounded-full bg-editorial-charcoal px-4 py-2 text-xs text-editorial-cream">Create badge</button></div>
+    {initial && <BadgeForm initial={initial} locked={locked} submitLabel={editing === 'new' ? 'Save draft' : 'Save changes'} busy={create.isPending || save.isPending} onCancel={() => setEditing(null)} onSubmit={submit} />}
+    <AdminListControls query={query} onChange={update}>
+      <FilterField label="Active"><select value={query.isActive} onChange={e => update({ isActive: e.target.value })}><option value="">All</option><option value="true">Active</option><option value="false">Inactive</option></select></FilterField>
+      <FilterField label="Sort by"><select value={query.sortBy} onChange={e => update({ sortBy: e.target.value })}><option>createdAt</option><option>name</option><option>order</option><option>isActive</option></select></FilterField>
+      <FilterField label="Order"><select value={query.sortOrder} onChange={e => update({ sortOrder: e.target.value })}><option>DESC</option><option>ASC</option></select></FilterField>
+    </AdminListControls>
+    {error && <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-xs text-rose-600">{error}</p>}
+    <AdminListState loading={list.isLoading} error={list.error} empty={!list.data?.badges.length}><div className="space-y-3">{list.data?.badges.map(item => {
+      const lifecycle = badgeLifecycle(item);
+      return <article key={item.id} className="flex flex-wrap items-center gap-3 rounded-2xl border bg-editorial-card p-4">
+        <div className="min-w-0 flex-1"><p className="text-sm font-bold">{item.name}</p><p className="text-[10px] text-editorial-charcoal/50">{item.code} · order {item.order} · {lifecycle}</p></div>
+        <button type="button" title="Edit" aria-label={`Edit ${item.name}`} onClick={() => setEditing(item)} className="rounded-full border p-2"><Pencil className="h-4 w-4" /></button>
+        {lifecycle !== 'Active' && <button type="button" title="Activate" aria-label={`Activate ${item.name}`} onClick={() => setConfirm({ id: item.id, action: 'activate' })} className="rounded-full border p-2"><Play className="h-4 w-4" /></button>}
+        {lifecycle === 'Active' && <button type="button" title="Retire" aria-label={`Retire ${item.name}`} onClick={() => setConfirm({ id: item.id, action: 'retire' })} className="rounded-full border p-2"><Archive className="h-4 w-4" /></button>}
+        {lifecycle !== 'Active' && <button type="button" title="Delete" aria-label={`Delete ${item.name}`} onClick={() => setConfirm({ id: item.id, action: 'delete' })} className="rounded-full border p-2"><Trash2 className="h-4 w-4 text-rose-600" /></button>}
+      </article>;
+    })}</div></AdminListState>
+    {list.data && <AdminPagination page={list.data.page} limit={list.data.limit} total={list.data.total} totalPages={list.data.totalPages} onChange={update} />}
+    <ConfirmDialog open={!!confirm} title={confirmTitle} description={confirmDescription} destructive={confirm?.action !== 'activate'} confirmLabel={confirm?.action === 'activate' ? 'Activate' : confirm?.action === 'retire' ? 'Retire' : 'Delete'} busy={confirmBusy} onCancel={() => setConfirm(null)} onConfirm={() => {
+      if (!confirm) return;
+      if (confirm.action === 'activate') void run('activate', () => save.mutateAsync({ id: confirm.id, input: { isActive: true } }));
+      else if (confirm.action === 'retire') void run('retire', () => retire.mutateAsync(confirm.id));
+      else void run('delete', () => remove.mutateAsync(confirm.id));
+    }} />
+  </div>;
 }
 
 export function AdminNotifications() {

@@ -128,4 +128,36 @@
   background-color: rgba(28, 25, 23, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
+/* Field-update Markdown is scoped so cards, previews, and details share one readable treatment. */
+.field-update-markdown {
+  color: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
 
+.field-update-markdown > :first-child { margin-top: 0; }
+.field-update-markdown > :last-child { margin-bottom: 0; }
+.field-update-markdown p,
+.field-update-markdown ul,
+.field-update-markdown ol,
+.field-update-markdown blockquote,
+.field-update-markdown pre { margin: 0.75rem 0; }
+.field-update-markdown h1,
+.field-update-markdown h2,
+.field-update-markdown h3,
+.field-update-markdown h4 { font-family: Georgia, serif; font-weight: 700; line-height: 1.25; margin: 1.1rem 0 0.55rem; }
+.field-update-markdown h1 { font-size: 1.75rem; }
+.field-update-markdown h2 { font-size: 1.45rem; }
+.field-update-markdown h3 { font-size: 1.2rem; }
+.field-update-markdown ul,
+.field-update-markdown ol { padding-inline-start: 1.5rem; }
+.field-update-markdown ul { list-style: disc; }
+.field-update-markdown ol { list-style: decimal; }
+.field-update-markdown a { color: #9a3412; font-weight: 600; text-decoration: underline; text-underline-offset: 0.18em; }
+.field-update-markdown a:focus-visible { border-radius: 0.15rem; outline: 2px solid currentColor; outline-offset: 3px; }
+.field-update-markdown blockquote { border-inline-start: 3px solid currentColor; opacity: 0.82; padding-inline-start: 1rem; }
+.field-update-markdown code { border-radius: 0.3rem; background: rgb(0 0 0 / 0.07); padding: 0.08rem 0.3rem; font-family: ui-monospace, monospace; font-size: 0.88em; }
+.field-update-markdown pre { overflow-x: auto; border-radius: 0.75rem; background: rgb(0 0 0 / 0.07); padding: 0.85rem; }
+.field-update-markdown pre code { background: transparent; padding: 0; }
+.field-update-markdown img { height: auto; max-width: 100%; }

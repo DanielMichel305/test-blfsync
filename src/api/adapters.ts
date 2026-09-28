@@ -1,5 +1,5 @@
 import type { components } from './generated';
-import type { AppNotification, Badge, Donor, Track, UpdateFeed } from '../types';
+import type { AppNotification, Badge, Donor, Subscription, Track, UpdateFeed } from '../types';
 
 type S = components['schemas'];
 
@@ -25,10 +25,23 @@ export function userToDonor(user: S['User']): Donor {
     donor_id: user.id,
     name: [user.firstName, user.lastName].filter(Boolean).join(' '),
     email: user.email,
+    first_name: user.firstName,
+    last_name: user.lastName,
+    username: user.username,
+    phone: user.phone || undefined,
+    communication_opt_in: user.communicationOptIn,
+    referral_source: user.referralSource || undefined,
+    inviter: user.inviter ? { id: user.inviter.id, first_name: user.inviter.firstName, last_name: user.inviter.lastName } : null,
     join_date: user.createdAt,
     avatar_url: user.profilePictureUrl || undefined,
     role: user.role === 'admin' ? 'admin' : 'donor',
     api_role: user.role,
+    is_active: user.isActive,
+    two_factor_enabled: user.twoFactorEnabled,
+    last_login_at: user.lastLoginAt,
+    has_password: user.hasPassword,
+    invitation_pending: user.invitationPending,
+    updated_at: user.updatedAt,
   };
 }
 
@@ -69,6 +82,28 @@ export function publicMinistryTrackToTrack(track: S['PublicMinistryTrack'], inde
   };
 }
 
+export function subscriptionCommitmentToSubscription(commitment: S['SubscriptionCommitment']): Subscription | null {
+  const subscription = commitment.subscription;
+  const trackId = subscription?.ministryTrackId || commitment.ministryTrack?.id;
+  if (
+    commitment.type !== 'recurring'
+    || !subscription
+    || !trackId
+    || subscription.amount == null
+    || !subscription.interval
+    || !['active', 'trialing', 'canceled'].includes(subscription.subscriptionStatus)
+  ) return null;
+
+  return {
+    subscription_id: subscription.id,
+    track_id: trackId,
+    amount: subscription.amount,
+    frequency: subscription.interval === 'year' ? 'annual' : 'monthly',
+    status: subscription.subscriptionStatus,
+    current_period_end: subscription.currentPeriodEnd,
+  };
+}
+
 export function userBadgeToBadge(badge: S['UserBadge'], userId: string): Badge {
   return {
     badge_id: badge.id,
@@ -76,6 +111,8 @@ export function userBadgeToBadge(badge: S['UserBadge'], userId: string): Badge {
     badge_type: badge.code,
     name: badge.name,
     description: badge.description,
+    earned: badge.earned,
+    progress: badge.progress,
   };
 }
 

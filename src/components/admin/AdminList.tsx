@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react';
-import { ApiError } from '../../api/client';
+import { getApiErrorMessage } from '../../api/errors';
 
 export type AdminQueryValue = string | number | boolean | undefined;
 export type AdminListQuery = Record<string, AdminQueryValue> & { page: number; limit: number; search?: string };
@@ -59,8 +59,8 @@ export function AdminListControls({
   searchPlaceholder?: string;
 }) {
   return <div className="rounded-2xl border border-editorial-charcoal/10 bg-editorial-card p-4 space-y-3">
-    <label className="relative block">
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-editorial-charcoal/35" />
+    <label className="block text-[9px] font-bold uppercase tracking-wider text-editorial-charcoal/45">Search
+      <span className="relative mt-1 block"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-editorial-charcoal/35" />
       <input
         type="search"
         value={query.search || ''}
@@ -68,6 +68,7 @@ export function AdminListControls({
         placeholder={searchPlaceholder}
         className="w-full rounded-xl border border-editorial-charcoal/15 bg-transparent py-2 pl-9 pr-3 text-sm"
       />
+      </span>
     </label>
     <div className="flex flex-wrap items-end gap-3">{children}</div>
   </div>;
@@ -97,7 +98,7 @@ export function AdminPagination({ page, limit, total, totalPages, onChange }: { 
 
 export function AdminListState({ loading, error, empty, children }: { loading: boolean; error: unknown; empty: boolean; children: React.ReactNode }) {
   if (loading) return <div className="flex justify-center rounded-2xl border border-dashed p-10" aria-label="Loading"><Loader2 className="h-5 w-5 animate-spin" /></div>;
-  if (error) return <div role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-700"><AlertCircle className="h-4 w-4" />{error instanceof ApiError ? error.message : 'This list could not be loaded.'}</div>;
+  if (error) return <div role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-700 dark:text-rose-300"><AlertCircle className="h-4 w-4" />{getApiErrorMessage(error, 'This list could not be loaded.')}</div>;
   if (empty) return <div className="rounded-2xl border border-dashed border-editorial-charcoal/20 p-10 text-center text-sm text-editorial-charcoal/45">No records match the current filters.</div>;
   return <>{children}</>;
 }
