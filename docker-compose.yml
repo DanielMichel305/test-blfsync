@@ -1,0 +1,12 @@
+services:
+  blfriends-frontend:
+    image: ${IMAGE_REF:?IMAGE_REF must be set to the immutable frontend image digest}
+    container_name: blfriends-frontend
+    networks:
+      - blfriends-web
+    restart: unless-stopped
+
+networks:
+  blfriends-web:
+    external: true
+    name: blfriends-web
