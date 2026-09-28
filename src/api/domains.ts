@@ -169,8 +169,8 @@ export const publicApi = {
 };
 
 export const fieldUpdatesApi = {
-  list: (params: ListParams = {}) => apiRequest<S['FieldUpdatePage']>(withQuery('/field-updates', params), { auth: false }),
-  get: (id: string) => apiRequest<S['FieldUpdate']>(`/field-updates/${id}`, { auth: false }),
+  list: (params: ListParams = {}) => apiRequest<S['FieldUpdatePage']>(withQuery('/field-updates', params)),
+  get: (id: string) => apiRequest<S['FieldUpdate']>(`/field-updates/${id}`),
   create: (input: FieldUpdateInput) => apiRequest<{ fieldUpdate: S['FieldUpdate'] }>('/field-updates', { method: 'POST', body: toFormData(input) }),
   update: (id: string, input: FieldUpdateEdit) => apiRequest<{ fieldUpdate: S['FieldUpdate'] }>(`/field-updates/${id}`, { method: 'PATCH', body: toFormData(input) }),
   delete: (id: string) => apiRequest<{ fieldUpdate: S['FieldUpdate'] }>(`/field-updates/${id}`, { method: 'DELETE' }),
