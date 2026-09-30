@@ -88,12 +88,6 @@ async function render(element: React.ReactNode) {
   return container;
 }
 
-function mobileMenuButton(container: HTMLElement) {
-  const match = [...container.querySelectorAll('button')].find(element => element.className.includes('md:hidden'));
-  if (!match) throw new Error('Mobile menu button not found');
-  return match;
-}
-
 beforeEach(() => {
   localStorage.clear();
   vi.stubGlobal('IntersectionObserver', class {
@@ -199,7 +193,7 @@ describe('badge collection', () => {
 });
 
 describe('role-based referral navigation and protection', () => {
-  it.each(['family', 'admin'] as const)('shows desktop and mobile-header referral navigation for %s', async apiRole => {
+  it.each(['family', 'admin'] as const)('shows desktop referral navigation for %s without a redundant mobile-header menu', async apiRole => {
     const container = await render(<Header
       currentUser={donor(apiRole)}
       onUserChange={vi.fn()}
@@ -211,13 +205,11 @@ describe('role-based referral navigation and protection', () => {
       theme="light"
       onToggleTheme={vi.fn()}
     />);
-    expect(mobileMenuButton(container).className.split(/\s+/)).not.toContain('hidden');
     expect(container.textContent?.match(/Refer Friends/g)).toHaveLength(1);
-    await act(async () => { mobileMenuButton(container).dispatchEvent(new MouseEvent('click', { bubbles: true })); });
-    expect(container.textContent?.match(/Refer Friends/g)).toHaveLength(2);
+    expect(container.querySelector('button[aria-label="Open navigation menu"]')).toBeNull();
   });
 
-  it('hides desktop and mobile-header referral navigation for Friends', async () => {
+  it('hides referral navigation for Friends', async () => {
     const container = await render(<Header
       currentUser={donor('friend')}
       onUserChange={vi.fn()}
@@ -229,10 +221,8 @@ describe('role-based referral navigation and protection', () => {
       theme="light"
       onToggleTheme={vi.fn()}
     />);
-    expect(mobileMenuButton(container).className.split(/\s+/)).not.toContain('hidden');
     expect(container.textContent).not.toContain('Refer Friends');
-    await act(async () => { mobileMenuButton(container).dispatchEvent(new MouseEvent('click', { bubbles: true })); });
-    expect(container.textContent).not.toContain('Refer Friends');
+    expect(container.querySelector('button[aria-label="Open navigation menu"]')).toBeNull();
   });
 
   it('redirects stale Friend referral state before mounting the panel while allowing Family and admin', async () => {
