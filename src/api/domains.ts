@@ -3,71 +3,13 @@ import { apiRequest, clearSession, toFormData, withQuery } from "./client";
 import { getRefreshToken, storeTokens } from "./session";
 
 type S = components["schemas"];
-export type MinistryUnit = { id: string; name: string };
-export type CreateMinistryTrackInput = Omit<
-  S["CreateMinistryTrackRequest"],
-  "cover_url"
-> & { cover_url?: string | null; coverImage?: File };
-export type UpdateMinistryTrackInput = Omit<
-  S["UpdateMinistryTrackRequest"],
-  "cover_url"
-> & { cover_url?: string | null; coverImage?: File };
-type MinistryUnitsResponse = MinistryUnit[] | { units?: MinistryUnit[] };
-type MinistryUnitResponse = MinistryUnit | { unit?: MinistryUnit };
 type PageParams = { page?: number; limit?: number };
 type ListParams = PageParams &
   Record<string, string | number | boolean | undefined>;
-type UserFileInput = Omit<S["CreateUserRequest"], "profilePictureUrl"> & {
-  profilePictureUrl?: File;
-};
-type UserFileUpdate = Omit<S["UpdateUserRequest"], "profilePictureUrl"> & {
-  profilePictureUrl?: File;
-};
-type TestimonyInput = Omit<S["CreateTestimonyRequest"], "coverImage"> & {
-  coverImage?: File;
-};
-type TestimonyUpdate = Omit<S["UpdateTestimonyRequest"], "coverImage"> & {
-  coverImage?: File;
-};
 type ProfileFileUpdate = Omit<
   S["UpdateProfileRequest"],
   "profilePictureUrl"
 > & { profilePictureUrl?: File };
-export type FieldUpdateCreateInput = Omit<
-  S["CreateFieldUpdateMultipartRequest"],
-  "media"
-> & { media?: File };
-export type FieldUpdateUpdateInput = Omit<
-  S["UpdateFieldUpdateMultipartRequest"],
-  "media"
-> & { media?: File };
-type InvitationPage = S["Pagination"] & { invitations: S["Invitation"][] };
-export type AdminCheckoutSession = {
-  paymentRequestId: string;
-  track?: { name?: string; title?: string } | null;
-  paymentType?: string | null;
-  interval?: string | null;
-  requestedAmount?: number | null;
-  currency?: string | null;
-  status: string;
-  attemptedAt?: string | null;
-  completedAt?: string | null;
-  failureReason?: string | null;
-  createdAt: string;
-  updatedAt?: string | null;
-  mode?: string | null;
-  submitType?: string | null;
-};
-type AdminCheckoutSessionPage = S["Pagination"] & {
-  checkoutSessions: AdminCheckoutSession[];
-};
-type RawAdminCheckoutSession = Omit<
-  AdminCheckoutSession,
-  "paymentRequestId"
-> & { paymentRequestId?: string; id?: string };
-type RawAdminCheckoutSessionPage = S["Pagination"] & {
-  checkoutSessions: RawAdminCheckoutSession[];
-};
 
 export const authApi = {
   async login(input: S["LoginRequest"]) {
@@ -171,49 +113,6 @@ export const authApi = {
 export const ministryTracksApi = {
   list: (params: ListParams = {}) =>
     apiRequest<S["MinistryTrackPage"]>(withQuery("/ministry-tracks", params)),
-  get: (id: string) => apiRequest<S["MinistryTrack"]>(`/ministry-tracks/${id}`),
-  create: (input: CreateMinistryTrackInput) => {
-    const { coverImage, ...fields } = input;
-    return apiRequest<S["MinistryTrack"]>("/ministry-tracks", {
-      method: "POST",
-      body: coverImage ? toFormData({ ...fields, coverImage }) : fields,
-    });
-  },
-  update: (id: string, input: UpdateMinistryTrackInput) => {
-    const { coverImage, ...fields } = input;
-    return apiRequest<S["MinistryTrack"]>(`/ministry-tracks/${id}`, {
-      method: "PATCH",
-      body: coverImage ? toFormData({ ...fields, coverImage }) : fields,
-    });
-  },
-  delete: (id: string) =>
-    apiRequest<{ message: string }>(`/ministry-tracks/${id}`, {
-      method: "DELETE",
-    }),
-  commitments: (id: string, params: PageParams = {}) =>
-    apiRequest<S["MinistryTrackCommitments"]>(
-      withQuery(`/ministry-tracks/${id}/commitments`, params),
-    ),
-};
-
-/** Active ministry units are available to every authenticated user. */
-export const unitsApi = {
-  async list(): Promise<MinistryUnit[]> {
-    const response = await apiRequest<MinistryUnitsResponse>("/units");
-    return Array.isArray(response) ? response : response.units || [];
-  },
-  async create(input: { name: string }): Promise<MinistryUnit> {
-    const response = await apiRequest<MinistryUnitResponse>("/units", {
-      method: "POST",
-      body: input,
-    });
-    const unit = "id" in response ? response : response.unit;
-    if (!unit)
-      throw new Error("Unit creation response is missing the new unit.");
-    return unit;
-  },
-  delete: (id: string) =>
-    apiRequest<{ message: string }>(`/units/${id}`, { method: "DELETE" }),
 };
 
 export const subscriptionsApi = {
@@ -251,39 +150,6 @@ export const paymentsApi = {
   get: (transactionId: string) =>
     apiRequest<S["Payment"]>(`/payments/${transactionId}`, {
       cache: "no-store",
-    }),
-  forUser: (id: string, params: ListParams = {}) =>
-    apiRequest<S["PaymentPage"]>(withQuery(`/users/${id}/payments`, params)),
-};
-export const checkoutSessionsApi = {
-  async forUser(
-    userId: string,
-    params: ListParams = {},
-  ): Promise<AdminCheckoutSessionPage> {
-    const result = await apiRequest<RawAdminCheckoutSessionPage>(
-      withQuery("/checkout-sessions", { ...params, userId }),
-    );
-    return {
-      ...result,
-      checkoutSessions: result.checkoutSessions.map((session) => {
-        const paymentRequestId = session.paymentRequestId || session.id;
-        if (!paymentRequestId)
-          throw new Error(
-            "Checkout session response is missing its payment request ID.",
-          );
-        return { ...session, paymentRequestId };
-      }),
-    };
-  },
-  delete: (id: string) =>
-    apiRequest<{ message: string }>(`/checkout-sessions/${id}`, {
-      method: "DELETE",
-    }),
-  // The current checkout-session contract only documents DELETE. It is used
-  // for both administrative removal and expiration until a separate route is published.
-  expire: (id: string) =>
-    apiRequest<{ message: string }>(`/checkout-sessions/${id}`, {
-      method: "DELETE",
     }),
 };
 
@@ -339,48 +205,6 @@ export const prayerWallApi = {
       `/prayer-wall/${id}/reactions/${reactionType}`,
       { method: "DELETE" },
     ),
-  manageThreads: (params: ListParams = {}) =>
-    apiRequest<S["Pagination"] & { threads: S["ManagedThread"][] }>(
-      withQuery("/prayer-wall/manage/threads", params),
-    ),
-  manageThread: (id: string, params: PageParams = {}) =>
-    apiRequest<{
-      thread: S["ManagedThread"];
-      comments: S["ManagedCommentPage"];
-    }>(withQuery(`/prayer-wall/manage/threads/${id}`, params)),
-  moderateDeleteThread: (id: string, reason: string) =>
-    apiRequest<{
-      message: string;
-      thread: S["ManagedThread"];
-      comments: S["ManagedCommentPage"];
-    }>(`/prayer-wall/manage/threads/${id}`, {
-      method: "DELETE",
-      body: { reason },
-    }),
-  restoreThread: (id: string) =>
-    apiRequest<{
-      message: string;
-      thread: S["ManagedThread"];
-      comments: S["ManagedCommentPage"];
-    }>(`/prayer-wall/manage/threads/${id}/restore`, { method: "PATCH" }),
-  manageComments: (params: ListParams = {}) =>
-    apiRequest<S["Pagination"] & { comments: S["ManagedComment"][] }>(
-      withQuery("/prayer-wall/manage/comments", params),
-    ),
-  manageComment: (id: string) =>
-    apiRequest<{ comment: S["ManagedComment"] }>(
-      `/prayer-wall/manage/comments/${id}`,
-    ),
-  moderateDeleteComment: (id: string, reason: string) =>
-    apiRequest<{ message: string; comment: S["ManagedComment"] }>(
-      `/prayer-wall/manage/comments/${id}`,
-      { method: "DELETE", body: { reason } },
-    ),
-  restoreComment: (id: string) =>
-    apiRequest<{ message: string; comment: S["ManagedComment"] }>(
-      `/prayer-wall/manage/comments/${id}/restore`,
-      { method: "PATCH" },
-    ),
 };
 
 export const notificationsApi = {
@@ -395,90 +219,10 @@ export const notificationsApi = {
       "/notifications/read-all",
       { method: "PATCH" },
     ),
-  manage: (params: ListParams = {}) =>
-    apiRequest<S["ManagedNotificationPage"]>(
-      withQuery("/notifications/manage", params),
-    ),
-  create: (input: S["CreateAdminNotificationRequest"]) =>
-    apiRequest<S["ManagedNotification"]>("/notifications/manage", {
-      method: "POST",
-      body: input,
-    }),
-  getManaged: (id: string) =>
-    apiRequest<S["ManagedNotification"]>(`/notifications/manage/${id}`),
 };
 
-export const usersApi = {
-  list: (params: ListParams = {}) =>
-    apiRequest<S["UserPage"]>(withQuery("/users", params)),
-  get: (id: string) => apiRequest<{ user: S["User"] }>(`/users/${id}`),
-  create: (input: UserFileInput) =>
-    apiRequest<{ message: string; user: S["User"] }>("/users", {
-      method: "POST",
-      body: toFormData(input),
-    }),
-  update: (id: string, input: UserFileUpdate) =>
-    apiRequest<{ message: string; user: S["User"] }>(`/users/${id}`, {
-      method: "PATCH",
-      body: toFormData(input),
-    }),
-  delete: (id: string) =>
-    apiRequest<S["UserDeletionResponse"]>(`/users/${id}`, { method: "DELETE" }),
-  resendInvitation: (id: string, expiresInHours?: number) =>
-    apiRequest<{ message: string; user: S["User"] }>(
-      `/users/${id}/resend-invite`,
-      { method: "POST", body: expiresInHours ? { expiresInHours } : undefined },
-    ),
-  badges: (id: string) => apiRequest<S["UserBadge"][]>(`/users/${id}/badges`),
-  commitments: (id: string, params: ListParams = {}) =>
-    apiRequest<S["CommitmentPage"]>(
-      withQuery(`/users/${id}/commitments`, params),
-    ),
-  payments: (id: string, params: ListParams = {}) =>
-    apiRequest<S["PaymentPage"]>(withQuery(`/users/${id}/payments`, params)),
-  prayerActivity: (id: string, params: ListParams = {}) =>
-    apiRequest<S["PrayerActivityPage"]>(
-      withQuery(`/users/${id}/prayer-activity`, params),
-    ),
-};
-
-export const invitationsApi = {
-  async list(params: ListParams = {}): Promise<InvitationPage> {
-    const result = await apiRequest<{
-      invitations: S["Invitation"][];
-      total?: number;
-      page?: number;
-      limit?: number;
-      totalPages?: number;
-    }>(withQuery("/invitations", params));
-    const page = result.page ?? Number(params.page ?? 1);
-    const limit =
-      result.limit ??
-      Number(params.limit ?? Math.max(result.invitations.length, 1));
-    const total = result.total ?? result.invitations.length;
-    return {
-      ...result,
-      page,
-      limit,
-      total,
-      totalPages: result.totalPages ?? Math.max(1, Math.ceil(total / limit)),
-    };
-  },
-  create: (input: S["CreateInvitationRequest"]) =>
-    apiRequest<{ message: string; invitation: S["Invitation"] }>(
-      "/invitations",
-      { method: "POST", body: input },
-    ),
-  resend: (id: string, expiresInHours?: number) =>
-    apiRequest<{ message: string; invitation: S["Invitation"] }>(
-      `/invitations/${id}/resend`,
-      { method: "POST", body: expiresInHours ? { expiresInHours } : undefined },
-    ),
-  revoke: (id: string) =>
-    apiRequest<{ message: string; invitation: S["Invitation"] }>(
-      `/invitations/${id}/revoke`,
-      { method: "POST" },
-    ),
+export const userBadgesApi = {
+  list: (id: string) => apiRequest<S["UserBadge"][]>(`/users/${id}/badges`),
 };
 
 export const referralsApi = {
@@ -526,37 +270,6 @@ export const fieldUpdatesApi = {
     );
     return result.fieldUpdate;
   },
-  async create(input: FieldUpdateCreateInput) {
-    const { media, ...json } = input;
-    const body = media ? toFormData(input as Record<string, unknown>) : json;
-    const result = await apiRequest<{ fieldUpdate: S["FieldUpdate"] }>(
-      "/field-updates",
-      { method: "POST", body },
-    );
-    return result.fieldUpdate;
-  },
-  async update(id: string, input: FieldUpdateUpdateInput) {
-    const { media, ...json } = input;
-    const body = media ? toFormData(input as Record<string, unknown>) : json;
-    const result = await apiRequest<{ fieldUpdate: S["FieldUpdate"] }>(
-      `/field-updates/${id}`,
-      { method: "PATCH", body },
-    );
-    return result.fieldUpdate;
-  },
-  publish: (id: string, publishedAt?: string) =>
-    fieldUpdatesApi.update(id, {
-      status: "published",
-      ...(publishedAt ? { publishedAt } : {}),
-    }),
-  archive: async (id: string) => {
-    const result = await apiRequest<{ fieldUpdate: S["FieldUpdate"] }>(
-      `/field-updates/${id}`,
-      { method: "DELETE" },
-    );
-    return result.fieldUpdate;
-  },
-  restore: (id: string) => fieldUpdatesApi.update(id, { status: "published" }),
 };
 
 export const contactApi = {
@@ -568,84 +281,12 @@ export const contactApi = {
     }),
 };
 
-export const logsApi = {
-  list: (params: ListParams = {}) =>
-    apiRequest<S["AuditLogPage"]>(withQuery("/logs", params)),
-};
-
 export const announcementsApi = {
   list: (params: PageParams = {}) =>
     apiRequest<S["AnnouncementPage"]>(withQuery("/announcements", params)),
-  manage: (params: ListParams = {}) =>
-    apiRequest<S["ManagedAnnouncementPage"]>(
-      withQuery("/announcements/manage", params),
-    ),
-  get: (id: string) =>
-    apiRequest<{ announcement: S["ManagedAnnouncement"] }>(
-      `/announcements/${id}`,
-    ),
-  create: (input: S["CreateAnnouncementRequest"]) =>
-    apiRequest<{ message: string; announcement: S["ManagedAnnouncement"] }>(
-      "/announcements",
-      { method: "POST", body: input },
-    ),
-  update: (id: string, input: S["UpdateAnnouncementRequest"]) =>
-    apiRequest<{ message: string; announcement: S["ManagedAnnouncement"] }>(
-      `/announcements/${id}`,
-      { method: "PATCH", body: input },
-    ),
-  restore: (id: string) =>
-    apiRequest<{ message: string; announcement: S["ManagedAnnouncement"] }>(
-      `/announcements/${id}/restore`,
-      { method: "PATCH" },
-    ),
-  delete: (id: string) =>
-    apiRequest<{ message: string }>(`/announcements/${id}`, {
-      method: "DELETE",
-    }),
 };
 
 export const testimoniesApi = {
   list: (params: PageParams = {}) =>
     apiRequest<S["TestimonyPage"]>(withQuery("/testimonies", params)),
-  manage: (params: ListParams = {}) =>
-    apiRequest<S["ManagedTestimonyPage"]>(
-      withQuery("/testimonies/manage", params),
-    ),
-  get: (id: string) =>
-    apiRequest<{ testimony: S["ManagedTestimony"] }>(`/testimonies/${id}`),
-  create: (input: TestimonyInput) =>
-    apiRequest<{ message: string; testimony: S["ManagedTestimony"] }>(
-      "/testimonies",
-      { method: "POST", body: toFormData(input) },
-    ),
-  update: (id: string, input: TestimonyUpdate) =>
-    apiRequest<{ message: string; testimony: S["ManagedTestimony"] }>(
-      `/testimonies/${id}`,
-      { method: "PATCH", body: toFormData(input) },
-    ),
-  delete: (id: string) =>
-    apiRequest<{ message: string }>(`/testimonies/${id}`, { method: "DELETE" }),
-};
-
-export const badgesApi = {
-  list: (params: ListParams = {}) =>
-    apiRequest<S["BadgePage"]>(withQuery("/badges", params)),
-  get: (id: string) => apiRequest<{ badge: S["Badge"] }>(`/badges/${id}`),
-  create: (input: S["CreateBadgeRequest"]) =>
-    apiRequest<{ message: string; badge: S["Badge"] }>("/badges", {
-      method: "POST",
-      body: input,
-    }),
-  update: (id: string, input: S["UpdateBadgeRequest"]) =>
-    apiRequest<{ message: string; badge: S["Badge"] }>(`/badges/${id}`, {
-      method: "PATCH",
-      body: input,
-    }),
-  retire: (id: string) =>
-    apiRequest<{ message: string; badge: S["Badge"] }>(`/badges/${id}/retire`, {
-      method: "PATCH",
-    }),
-  delete: (id: string) =>
-    apiRequest<{ message: string }>(`/badges/${id}`, { method: "DELETE" }),
 };

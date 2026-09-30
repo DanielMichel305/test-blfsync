@@ -12,14 +12,13 @@ import DonationModal from './components/DonationModal';
 
 const LandingPage = lazy(() => import('./components/LandingPage'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
-const AdminPanel = lazy(() => import('./components/AdminPanel'));
 const LoginPage = lazy(() => import('./components/LoginPage'));
 const NotFoundPage = lazy(() => import('./components/NotFoundPage'));
 const AcceptInvitePage = lazy(() => import('./components/RoutePages').then(module => ({ default: module.AcceptInvitePage })));
 const PaymentResultPage = lazy(() => import('./components/RoutePages').then(module => ({ default: module.PaymentResultPage })));
 const PrayerThreadPage = lazy(() => import('./components/PrayerWall').then(module => ({ default: module.PrayerThreadPage })));
 
-type AppTab = 'landing' | 'dashboard' | 'admin';
+type AppTab = 'landing' | 'dashboard';
 type DashboardSubTab = 'dashboard' | 'overview' | 'profile' | 'referrals' | 'prayer';
 type DonationIntent = { track: Track; amount: number; frequency: 'monthly' | 'annual' | 'one-time' };
 
@@ -64,13 +63,10 @@ export default function App() {
   const dashboardSubTab = dashboardSubTabForPath(pathname);
   const isDashboardRoute = dashboardSubTab !== null && pathname !== '/';
   const isPrayerThreadRoute = /^\/prayer-wall\/[^/]+\/?$/.test(pathname);
-  const isAdminRoute = pathname === '/admin' || /^\/(users|tracks)\/[^/]+\/?$/.test(pathname) || (isPrayerThreadRoute && currentUser?.role === 'admin');
   const isLoginRoute = pathname === '/login';
   const isJoinRoute = pathname === '/join';
   const isAuthRoute = isLoginRoute || isJoinRoute;
-  const activeTab: AppTab = isAdminRoute ? 'admin' : (isDashboardRoute || isAuthRoute) ? 'dashboard' : 'landing';
-  const selectedUserId = pathname.match(/^\/users\/([^/]+)\/?$/)?.[1];
-  const selectedTrackId = pathname.match(/^\/tracks\/([^/]+)\/?$/)?.[1];
+  const activeTab: AppTab = (isDashboardRoute || isAuthRoute) ? 'dashboard' : 'landing';
   const selectedPrayerThreadId = pathname.match(/^\/prayer-wall\/([^/]+)\/?$/)?.[1];
 
   const navigate = (nextPath: string, replace = false) => {
@@ -81,14 +77,14 @@ export default function App() {
     else window.history.pushState({}, '', url.pathname);
     setPathname(url.pathname);
   };
-  const setActiveTab = (tab: AppTab) => navigate(tab === 'landing' ? '/' : tab === 'dashboard' ? '/dashboard' : '/admin');
+  const setActiveTab = (tab: AppTab) => navigate(tab === 'landing' ? '/' : '/dashboard');
   const setDashboardSubTab = (tab: DashboardSubTab) => navigate(dashboardRoutes[tab]);
 
   const session = useSessionRestore();
   const checkout = useCreateCheckout();
   const authenticated = !!currentUser;
   const dashboardDataNeeded = dashboardSubTab === 'dashboard';
-  const tracksNeeded = dashboardDataNeeded || dashboardSubTab === 'overview' || isAdminRoute;
+  const tracksNeeded = dashboardDataNeeded || dashboardSubTab === 'overview';
   const publicContentNeeded = pathname === '/' || isAuthRoute;
   const tracksQuery = useMinistryTracks({ page: 1, limit: 100 }, authenticated && tracksNeeded);
   const publicTracksQuery = usePublicTracks({ page: 1, limit: 100 }, !authenticated && publicContentNeeded);
@@ -141,38 +137,6 @@ export default function App() {
     return () => window.removeEventListener('popstate', syncPath);
   }, []);
 
-  const navigateToUser = (id: string) => {
-    const url = new URL(window.location.href);
-    url.pathname = `/users/${encodeURIComponent(id)}`;
-    url.searchParams.set('admin_tab', 'users');
-    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
-    setPathname(url.pathname);
-  };
-
-  const closeUserDetail = () => {
-    const url = new URL(window.location.href);
-    url.pathname = '/admin';
-    url.searchParams.set('admin_tab', 'users');
-    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
-    setPathname(url.pathname);
-  };
-
-  const navigateToTrack = (id: string) => {
-    const url = new URL(window.location.href);
-    url.pathname = `/tracks/${encodeURIComponent(id)}`;
-    url.searchParams.set('admin_tab', 'tracks');
-    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
-    setPathname(url.pathname);
-  };
-
-  const closeTrackDetail = () => {
-    const url = new URL(window.location.href);
-    url.pathname = '/admin';
-    url.searchParams.set('admin_tab', 'tracks');
-    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
-    setPathname(url.pathname);
-  };
-
   const handleUserChange = (user: Donor | null) => {
     setCurrentUser(user);
   };
@@ -208,11 +172,7 @@ export default function App() {
 
   const handleAuthSuccess = (user: Donor) => {
     setCurrentUser(user);
-    if (user.role === 'admin') {
-      navigate('/admin');
-    } else {
-      navigate('/dashboard');
-    }
+    navigate('/dashboard');
   };
 
   const leaveStandaloneRoute = (destination: 'dashboard' | 'login', user?: Donor) => {
@@ -331,7 +291,7 @@ export default function App() {
             )
           )}
 
-          {isPrayerThreadRoute && !isAdminRoute && (
+          {isPrayerThreadRoute && (
             (!currentUser) ? (
               <motion.div key="thread-login" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }}><Suspense fallback={<RouteLoader />}><LoginPage onSuccess={handleAuthSuccess} onOpenAuth={() => navigate('/login')} tracks={tracks} onDonateClick={handleDonateTrigger} /></Suspense></motion.div>
             ) : (
@@ -339,40 +299,7 @@ export default function App() {
             )
           )}
 
-          {isAdminRoute && (
-            (!currentUser || currentUser.role !== 'admin') ? (
-              <motion.div
-                key="login"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-              >
-                <Suspense fallback={<RouteLoader />}><LoginPage onSuccess={handleAuthSuccess} onOpenAuth={() => navigate('/login')} tracks={tracks} onDonateClick={handleDonateTrigger} /></Suspense>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="admin"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-              >
-                <Suspense fallback={<RouteLoader />}><AdminPanel
-                  currentUser={currentUser}
-                  tracks={tracks}
-                  selectedUserId={selectedUserId ? decodeURIComponent(selectedUserId) : undefined}
-                  selectedTrackId={selectedTrackId ? decodeURIComponent(selectedTrackId) : undefined}
-                  selectedPrayerThreadId={selectedPrayerThreadId ? decodeURIComponent(selectedPrayerThreadId) : undefined}
-                  onOpenUser={navigateToUser}
-                  onCloseUser={closeUserDetail}
-                  onOpenTrack={navigateToTrack}
-                  onCloseTrack={closeTrackDetail}
-                /></Suspense>
-              </motion.div>
-            )
-          )}
-          {!dashboardSubTab && !isAuthRoute && !isAdminRoute && !isPrayerThreadRoute && <motion.div key="not-found" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Suspense fallback={<RouteLoader />}><NotFoundPage onGoHome={() => navigate('/')} /></Suspense></motion.div>}
+          {!dashboardSubTab && !isAuthRoute && !isPrayerThreadRoute && <motion.div key="not-found" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Suspense fallback={<RouteLoader />}><NotFoundPage onGoHome={() => navigate('/')} /></Suspense></motion.div>}
         </AnimatePresence>
         {guestDonation && <DonationModal
           track={guestDonation.track}

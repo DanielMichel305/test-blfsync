@@ -1,15 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Donor } from "../types";
 import {
-  Heart,
   User,
-  Shield,
   LogOut,
-  ArrowRight, X, Bell,
+  ArrowRight, Bell,
   Sun,
   Moon,
   Globe,
-  Menu,
 } from "lucide-react";
 import { useLanguage } from "../LanguageContext";
 import { useLogout, useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '../api/hooks';
@@ -20,8 +17,8 @@ interface HeaderProps {
   currentUser: Donor | null;
   onUserChange: (user: Donor | null) => void;
   onOpenAuth: () => void;
-  activeTab: "landing" | "dashboard" | "admin";
-  setActiveTab: (tab: "landing" | "dashboard" | "admin") => void;
+  activeTab: "landing" | "dashboard";
+  setActiveTab: (tab: "landing" | "dashboard") => void;
   dashboardSubTab:
     "dashboard" | "overview" | "profile" | "referrals" | "prayer";
   setDashboardSubTab: (
@@ -45,7 +42,6 @@ export default function Header({
   onNavigate,
 }: HeaderProps) {
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { language, setLanguage, t } = useLanguage();
   const notificationFeed = useNotifications({ page: 1, limit: 20 }, !!currentUser);
@@ -59,7 +55,6 @@ export default function Header({
     else { setActiveTab('dashboard'); setDashboardSubTab(tab); }
   };
   const openLanding = () => onNavigate ? onNavigate('/') : setActiveTab('landing');
-  const openAdmin = () => onNavigate ? onNavigate('/admin') : setActiveTab('admin');
   const isLanding = activeTab === 'landing';
   const isHeroHeader = activeTab === 'landing' && !isScrolled;
   const navItemClass = (isActive: boolean) => `text-[10px] uppercase tracking-wider font-bold px-4 py-2.5 md:px-3.5 md:py-1.5 rounded-full transition-all duration-250 cursor-pointer ${isActive
@@ -78,9 +73,6 @@ export default function Header({
 
   const getUserTierName = () => {
     if (!currentUser) return "";
-    if (currentUser.role === "admin")
-      return t("Staff Admin", "مسؤول النظام والخدمة");
-
     return currentUser.api_role === 'family'
       ? t('Family Partner', 'شريك العائلة')
       : t('Ministry Friend', 'صديق الخدمة');
@@ -97,15 +89,15 @@ export default function Header({
 
   return (
     <div className={`h-[68px] ${isLanding ? 'bg-[#0A0A0A]' : ''}`}>
-      <div className={`fixed left-0 z-50 w-full transition-[padding,top,margin] duration-300 ease-[cubic-bezier(.22,1,.36,1)] ${isScrolled ? 'top-4 mt-0 px-4 sm:px-6 lg:px-8' : 'top-0 mt-0 px-0'}`}>
+      <div className={`fixed left-0 z-50 box-border w-full transition-[padding,top,margin] duration-300 ease-[cubic-bezier(.22,1,.36,1)] ${isScrolled ? 'top-4 mt-0 px-4 sm:px-6 lg:px-8' : 'top-0 mt-0 px-0'}`}>
       <header
         id="app-header"
-        className={`mx-auto flex items-center justify-between px-4 py-2.5 sm:px-6 transition-[max-width,border-radius,background-color,border-color,box-shadow,backdrop-filter] duration-300 ease-[cubic-bezier(.22,1,.36,1)] ${isScrolled ? 'max-w-7xl rounded-full border border-editorial-charcoal/10 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl dark:bg-editorial-card/85 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]' : isHeroHeader ? 'max-w-[100rem] rounded-none border border-transparent bg-[#0A0A0A] shadow-none backdrop-blur-none' : 'max-w-[100rem] rounded-none border border-transparent bg-editorial-cream shadow-none backdrop-blur-none'}`}
+        className={`mx-auto flex items-center justify-between px-4 py-2.5 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:justify-normal transition-[max-width,border-radius,background-color,border-color,box-shadow,backdrop-filter] duration-300 ease-[cubic-bezier(.22,1,.36,1)] ${isScrolled ? 'max-w-7xl rounded-full border border-editorial-charcoal/10 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl dark:bg-editorial-card/85 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]' : isHeroHeader ? 'max-w-[100rem] rounded-none border border-transparent bg-[#0A0A0A] shadow-none backdrop-blur-none' : 'max-w-[100rem] rounded-none border border-transparent bg-editorial-cream shadow-none backdrop-blur-none'}`}
       >
         {/* Logo and App Name */}
         <div
           id="logo-container"
-          className="flex items-center gap-3.5 cursor-pointer animate-fade-in shrink-0"
+          className="flex min-w-0 flex-1 items-center gap-3.5 cursor-pointer animate-fade-in lg:flex-none lg:justify-self-start"
           onClick={() => {
             if (currentUser) {
               openDashboard("overview");
@@ -115,10 +107,10 @@ export default function Header({
           }}
         >
           <div className="text-start">
-            <h1 className={`font-serif italic text-lg sm:text-xl tracking-tight font-light leading-none ${isHeroHeader ? 'text-white' : 'text-editorial-charcoal'}`}>
+            <h1 className={`truncate font-serif italic text-lg sm:text-xl tracking-tight font-light leading-none md:overflow-visible md:text-clip md:whitespace-normal ${isHeroHeader ? 'text-white' : 'text-editorial-charcoal'}`}>
               {t("Better Life Friends", "شركاء الحياة الأفضل")}
             </h1>
-            <p className={`text-[8px] uppercase tracking-[0.15em] font-extrabold mt-1.5 ${isHeroHeader ? 'text-white/50' : 'text-editorial-charcoal/50'}`}>
+            <p className={`truncate text-[8px] uppercase tracking-[0.15em] font-extrabold mt-1.5 md:overflow-visible md:text-clip md:whitespace-normal ${isHeroHeader ? 'text-white/50' : 'text-editorial-charcoal/50'}`}>
               {t("Ministry Partner Portal", "بوابة شركاء الخدمة والعطاء")}
             </p>
           </div>
@@ -127,9 +119,9 @@ export default function Header({
         {/* Navigation Tabs */}
         <nav
           id="main-navigation"
-          className="hidden md:flex items-center gap-2"
+          className="hidden items-center gap-2 lg:flex lg:justify-self-center"
         >
-          {currentUser && (currentUser.role === "donor" || currentUser.role === "admin") && (
+          {currentUser && (
             <>
               <button
                 onClick={() => {
@@ -167,42 +159,25 @@ export default function Header({
             </>
           )}
 
-          {currentUser?.role === "admin" && (
-            <button
-              onClick={openAdmin}
-              className={navItemClass(activeTab === "admin")}
-            >
-              {t("Staff Admin Panel", "لوحة الإشراف")}
-            </button>
-          )}
         </nav>
 
         {/* Right side actions */}
-        <div id="header-actions" className="flex items-center gap-2.5">
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className={`md:hidden w-11 h-11 flex items-center justify-center shrink-0 ${headerControlClass}`}
-            aria-label={isMobileMenuOpen ? t('Close navigation menu', 'إغلاق قائمة التنقل') : t('Open navigation menu', 'فتح قائمة التنقل')}
-            aria-expanded={isMobileMenuOpen}
-          >
-            {isMobileMenuOpen ? (
-              <X className="w-4 h-4" />
-            ) : (
-              <Menu className="w-4 h-4" />
-            )}
-          </button>
+        <div id="header-actions" className="flex shrink-0 items-center gap-1.5 md:gap-2.5 lg:justify-self-end">
           {/* Language Switcher */}
           <button
             onClick={() => setLanguage(language === "en" ? "ar" : "en")}
-            className={`flex items-center justify-center h-11 gap-1.5 px-4 text-[9px] font-bold tracking-wider ${headerControlClass}`}
+            className={`flex h-11 w-11 items-center justify-center gap-0 px-0 text-[9px] font-bold tracking-wider md:w-auto md:gap-1.5 md:px-4 ${headerControlClass}`}
             title={
               language === "en"
                 ? "تغيير اللغة إلى العربية"
                 : "Switch Language to English"
             }
           >
-            <Globe className={`w-3.5 h-3.5 ${isHeroHeader ? 'text-white/70' : 'text-editorial-charcoal/70'}`} />
-            <span className="font-sans font-semibold">
+            <Globe className={`hidden h-3.5 w-3.5 md:block ${isHeroHeader ? 'text-white/70' : 'text-editorial-charcoal/70'}`} />
+            <span className="font-sans font-semibold md:hidden" aria-hidden="true">
+              {language === "en" ? "AR" : "En"}
+            </span>
+            <span className="hidden font-sans font-semibold md:inline">
               {language === "en" ? "العربية" : "English"}
             </span>
           </button>
@@ -210,7 +185,7 @@ export default function Header({
           
           {/* Notifications Toggle */}
           {currentUser && (
-            <div className="relative">
+            <div className="relative hidden md:block">
               <button
                 onClick={() => setShowNotificationsMenu(!showNotificationsMenu)}
                 className={`w-11 h-11 flex items-center justify-center relative ${headerControlClass}`}
@@ -290,7 +265,7 @@ export default function Header({
 
           {/* User profile / login */}
           {currentUser ? (
-            <div className={`relative group flex items-center gap-2 border-l rtl:border-l-0 rtl:border-r pl-4 rtl:pl-0 rtl:pr-4 cursor-pointer ${isHeroHeader ? 'border-white/15' : 'border-editorial-charcoal/10'}`}>
+            <div className={`relative group hidden items-center gap-2 border-l rtl:border-l-0 rtl:border-r pl-4 rtl:pl-0 rtl:pr-4 cursor-pointer md:flex ${isHeroHeader ? 'border-white/15' : 'border-editorial-charcoal/10'}`}>
               <div className={`w-11 h-11 flex items-center justify-center rounded-full transition-all ${isHeroHeader ? 'bg-white/10 text-white' : 'bg-editorial-charcoal/5 text-editorial-charcoal'}`}>
                 <User className="w-4 h-4" />
               </div>
@@ -336,71 +311,6 @@ export default function Header({
           )}
         </div>
 
-        {/* Mobile Menu Dropdown */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden absolute top-[110%] left-0 right-0 bg-editorial-cream border border-editorial-charcoal/10 rounded-2xl p-4 shadow-xl flex flex-col gap-2 z-50">
-            {currentUser && (currentUser.role === "donor" || currentUser.role === "admin") && (
-              <>
-                <button
-                  onClick={() => {
-                    openLanding();
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
-                >
-                  {t("Overview", "نظرة عامة")}
-                </button>
-                <button
-                  onClick={() => {
-                    openDashboard("dashboard");
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
-                >
-                  {t("Dashboard", "لوحة التحكم")}
-                </button>
-                <button
-                  onClick={() => {
-                    openDashboard("prayer");
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
-                >
-                  {t("Prayer Wall", "حائط الصلاة")}
-                </button>
-                <button
-                  onClick={() => {
-                    openDashboard("profile");
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
-                >
-                  {t("Profile & Contact", "الملف الشخصي")}
-                </button>
-                {canAccessReferrals(currentUser) && <button
-                  onClick={() => {
-                    openDashboard("referrals");
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
-                >
-                  {t("Refer Friends", "دعوة الأصدقاء")}
-                </button>}
-              </>
-            )}
-            {currentUser?.role === "admin" && (
-              <button
-                onClick={() => {
-                  openAdmin();
-                  setIsMobileMenuOpen(false);
-                }}
-                className="text-left px-4 py-2 font-bold text-editorial-charcoal hover:bg-editorial-charcoal/5 rounded-lg"
-              >
-                {t("Staff Admin Panel", "لوحة الإشراف")}
-              </button>
-            )}
-          </div>
-        )}
       </header>
       </div>
     </div>

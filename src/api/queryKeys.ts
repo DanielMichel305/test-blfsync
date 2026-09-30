@@ -8,12 +8,6 @@ export const queryKeys = {
   tracks: {
     all: ['ministry-tracks'] as const,
     list: (params: unknown = {}) => ['ministry-tracks', 'list', params] as const,
-    detail: (id: string) => ['ministry-tracks', 'detail', id] as const,
-    commitments: (id: string, params: unknown = {}) => ['ministry-tracks', id, 'commitments', params] as const,
-  },
-  units: {
-    all: ['units'] as const,
-    list: ['units', 'list'] as const,
   },
   subscriptions: {
     all: ['subscriptions'] as const,
@@ -24,10 +18,6 @@ export const queryKeys = {
     all: ['payments'] as const,
     list: (params: unknown = {}) => ['payments', 'list', params] as const,
     detail: (id: string) => ['payments', 'detail', id] as const,
-  },
-  checkoutSessions: {
-    all: ['checkout-sessions'] as const,
-    user: (id: string, params: unknown = {}) => ['checkout-sessions', 'user', id, params] as const,
   },
   referrals: {
     all: ['referrals'] as const,
@@ -44,52 +34,29 @@ export const queryKeys = {
     all: ['field-updates'] as const,
     lists: () => ['field-updates', 'list'] as const,
     userList: (params: unknown = {}) => ['field-updates', 'list', 'user', params] as const,
-    adminList: (params: unknown = {}) => ['field-updates', 'list', 'admin', params] as const,
     details: () => ['field-updates', 'detail'] as const,
     detail: (id: string) => ['field-updates', 'detail', id] as const,
   },
   badges: {
     all: ['badges'] as const,
-    list: (params: unknown = {}) => ['badges', 'list', params] as const,
-    detail: (id: string) => ['badges', 'detail', id] as const,
     user: (id: string) => ['badges', 'user', id] as const,
   },
   notifications: {
     all: ['notifications'] as const,
     feed: (params: unknown = {}) => ['notifications', 'feed', params] as const,
-    manage: (params: unknown = {}) => ['notifications', 'manage', params] as const,
-    managedDetail: (id: string) => ['notifications', 'manage', 'detail', id] as const,
   },
   prayerWall: {
     all: ['prayer-wall'] as const,
     list: (params: unknown = {}) => ['prayer-wall', 'list', params] as const,
     detail: (id: string, params: unknown = {}) => ['prayer-wall', 'detail', id, params] as const,
     comments: (id: string, params: unknown = {}) => ['prayer-wall', id, 'comments', params] as const,
-    manageThreads: (params: unknown = {}) => ['prayer-wall', 'manage', 'threads', params] as const,
-    manageComments: (params: unknown = {}) => ['prayer-wall', 'manage', 'comments', params] as const,
-    managedThread: (id: string) => ['prayer-wall', 'manage', 'thread', id] as const,
-    managedComment: (id: string) => ['prayer-wall', 'manage', 'comment', id] as const,
   },
   announcements: {
     all: ['announcements'] as const,
     feed: (params: unknown = {}) => ['announcements', 'feed', params] as const,
-    manage: (params: unknown = {}) => ['announcements', 'manage', params] as const,
-    detail: (id: string) => ['announcements', 'detail', id] as const,
   },
   testimonies: {
     all: ['testimonies'] as const,
     feed: (params: unknown = {}) => ['testimonies', 'feed', params] as const,
-    manage: (params: unknown = {}) => ['testimonies', 'manage', params] as const,
-    detail: (id: string) => ['testimonies', 'detail', id] as const,
-  },
-  admin: {
-    all: ['admin'] as const,
-    users: (params: unknown = {}) => ['admin', 'users', params] as const,
-    user: (id: string) => ['admin', 'user', id] as const,
-    userCommitments: (id: string, params: unknown = {}) => ['admin', 'user', id, 'commitments', params] as const,
-    userPayments: (id: string, params: unknown = {}) => ['admin', 'user', id, 'payments', params] as const,
-    userPrayerActivity: (id: string, params: unknown = {}) => ['admin', 'user', id, 'prayer-activity', params] as const,
-    invitations: (params: unknown = {}) => ['admin', 'invitations', params] as const,
-    logs: (params: unknown = {}) => ['admin', 'logs', params] as const,
   },
 };
